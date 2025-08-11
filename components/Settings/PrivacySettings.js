@@ -62,8 +62,8 @@ const PrivacySettingsScreen = ({ navigation }) => {
 
   // Render a radio option for visibility
   const renderRadioOption = ({ value, label, currentValue, onSelect }) => (
-    <TouchableOpacity 
-      style={styles.radioOption} 
+    <TouchableOpacity
+      style={styles.radioOption}
       onPress={() => onSelect(value)}
     >
       <View style={styles.radioOuterCircle}>
@@ -88,7 +88,7 @@ const PrivacySettingsScreen = ({ navigation }) => {
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}>
               <Icon name="arrow-back" size={30} color="#fff" />
@@ -96,10 +96,10 @@ const PrivacySettingsScreen = ({ navigation }) => {
             <Text style={styles.headerText}>Privacy Settings</Text>
           </View>
 
-          <ScrollView 
-            showsVerticalScrollIndicator={false} 
+          <ScrollView
+            showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}>
-            
+
             {/* Profile Visibility Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Profile Visibility</Text>
@@ -154,9 +154,9 @@ const PrivacySettingsScreen = ({ navigation }) => {
                 value: twoFactorAuth,
                 onValueChange: setTwoFactorAuth
               })}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.linkItem}
-                onPress={() => navigation.navigate('ChangePassword')}
+                onPress={() => navigation.navigate('PasswordSettings')}
               >
                 <View style={styles.settingIconContainer}>
                   <Icon name="lock" size={24} color="#fff" />
@@ -167,7 +167,7 @@ const PrivacySettingsScreen = ({ navigation }) => {
                 </View>
                 <Icon name="chevron-right" size={24} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.linkItem}
                 onPress={() => Alert.alert("Coming Soon", "This feature will be available in a future update.")}
               >
@@ -216,7 +216,7 @@ const PrivacySettingsScreen = ({ navigation }) => {
             </View>
 
             {/* Privacy Policy Link */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.policyLink}
               onPress={() => Alert.alert("Privacy Policy", "The privacy policy will open in a new window.")}
             >

@@ -1,5 +1,5 @@
-"use client"
-import { useState } from "react"
+'use client';
+import { useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -15,45 +15,74 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-} from "react-native"
-import * as ImagePicker from "expo-image-picker"
-import { BlurView } from "expo-blur"
-import { ArrowLeft, User, Mail, Phone, Eye, EyeOff, Check, School, CreditCard, Info } from "lucide-react-native"
+} from 'react-native';
+
+import * as ImagePicker from 'expo-image-picker';
+import { BlurView } from 'expo-blur';
+import {
+  ArrowLeft,
+  User,
+  Mail,
+  Phone,
+  Eye,
+  EyeOff,
+  Check,
+  School,
+  CreditCard,
+  Info,
+} from 'lucide-react-native';
+
+// Import Firebase services and functions
+// NOTE: These are placeholders. You must ensure your actual firebaseConfig.js file
+// exports these constants correctly.
+import {
+  FIREBASE_APP,
+  FIREBASE_AUTH,
+  FIRESTORE_DB,
+  FIREBASE_STORAGE,
+} from '../../../firebaseConfig';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 const LectuerProfileScreen = ({ navigation }) => {
-  const [profileImage, setProfileImage] = useState(null)
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [workEmail, setWorkEmail] = useState("")
-  const [institution, setInstitution] = useState("")
-  const [workId, setWorkId] = useState("")
-  const [bio, setBio] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("") // Added phone number state
-  const [password, setPassword] = useState("") // Added password state
-  const [confirmPassword, setConfirmPassword] = useState("") // Added confirm password state
-  const [termsAgreed, setTermsAgreed] = useState(false) // Added terms agreed state
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false) // Added show password state
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false) // Added show confirm password state
+  const [profileImage, setProfileImage] = useState(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [workEmail, setWorkEmail] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [workId, setWorkId] = useState('');
+  const [bio, setBio] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
-      Alert.alert("Permission Required", "You need to allow access to your photos to select an image.")
-      return
+      Alert.alert(
+        'Permission Required',
+        'You need to allow access to your photos to select an image.'
+      );
+      return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
-    })
+    });
     if (!result.canceled) {
-      setProfileImage(result.assets[0].uri)
+      setProfileImage(result.assets[0].uri);
     }
-  }
+  };
 
   const handleRegister = async () => {
+    // Client-side validation
     if (
       !firstName.trim() ||
       !lastName.trim() ||
@@ -61,44 +90,84 @@ const LectuerProfileScreen = ({ navigation }) => {
       !institution.trim() ||
       !workId.trim() ||
       !bio.trim() ||
-      !phoneNumber.trim() || // Validate phone number
-      !password.trim() || // Validate password
-      !confirmPassword.trim() // Validate confirm password
+      !phoneNumber.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim()
     ) {
-      Alert.alert("Missing Information", "Please fill out all required fields.")
-      return
+      Alert.alert(
+        'Missing Information',
+        'Please fill out all required fields.'
+      );
+      return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Password Mismatch", "Password and Confirm Password do not match.")
-      return
+      Alert.alert(
+        'Password Mismatch',
+        'Password and Confirm Password do not match.'
+      );
+      return;
     }
 
     if (!termsAgreed) {
-      Alert.alert("Terms and Conditions", "You must agree to the terms and conditions to register.")
-      return
+      Alert.alert(
+        'Terms and Conditions',
+        'You must agree to the terms and conditions to register.'
+      );
+      return;
     }
 
-    if (!profileImage) {
-      Alert.alert("Add Avatar", "We recommend using a picture of your face.")
-      return
-    }
+    setIsLoading(true);
 
-    setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      const registrationSuccess = true // Simulate successful registration
+    try {
+      // 1. Create user with email and password in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        FIREBASE_AUTH,
+        workEmail,
+        password
+      );
+      const user = userCredential.user;
 
-      if (registrationSuccess) {
-        Alert.alert("Registration Successful!", "Your account has been created.", [
-          { text: "OK", onPress: () => navigation.navigate("Login") },
-        ])
-      } else {
-        Alert.alert("Registration Failed", "Something went wrong. Please try again.")
+      // This is the key change: we simply store the local URI.
+      // If no image was selected, `profileImage` will be null, and we'll store null.
+      const profileImageUrl = profileImage;
+
+      // 2. Store additional user data in Firestore
+      await setDoc(doc(FIRESTORE_DB, 'lecturers', user.uid), {
+        firstName,
+        lastName,
+        workEmail,
+        institution,
+        workId,
+        bio,
+        phoneNumber,
+        profileImageUrl, // Store the local URI or null
+        termsAgreed,
+        createdAt: new Date(),
+      });
+
+      // 3. On successful registration, show success alert and navigate
+      Alert.alert(
+        'Registration Successful!',
+        'Your account has been created.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    } catch (error) {
+      // Handle Firebase Auth errors
+      let errorMessage = 'Something went wrong. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'That email address is already in use!';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'The password is too weak.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'That email address is invalid!';
       }
-    }, 2000) // Simulate 2-second registration process
-  }
+      Alert.alert('Registration Failed', errorMessage);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const isButtonDisabled =
     isLoading ||
@@ -112,17 +181,20 @@ const LectuerProfileScreen = ({ navigation }) => {
     !password.trim() ||
     !confirmPassword.trim() ||
     password !== confirmPassword ||
-    !termsAgreed ||
-    !profileImage // Disable if no profile image
+    !termsAgreed;
 
   return (
-    <ImageBackground source={require("../../../assets/lgbg.jpg")} style={styles.backgroundImage}>
+    <ImageBackground
+    source={require("../../../assets/lgbg.jpg")}
+      style={styles.backgroundImage}>
       <BlurView intensity={90} tint="dark" style={styles.blurOverlay}>
         <StatusBar barStyle="light-content" />
         <SafeAreaView style={styles.safeAreaForBackButton}>
           {/* Top Bar: Back Button */}
           <View style={styles.topBar}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}>
               <ArrowLeft size={30} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -132,10 +204,15 @@ const LectuerProfileScreen = ({ navigation }) => {
         <View style={styles.headerContent}>
           <View style={styles.headerTitleRow}>
             <Text style={styles.headerTitle}>Lecturer Registration</Text>
-            <TouchableOpacity style={styles.profileImageContainer} onPress={pickImage}>
+            <TouchableOpacity
+              style={styles.profileImageContainer}
+              onPress={pickImage}>
               <View style={styles.profileImageWrapper}>
                 {profileImage ? (
-                  <Image source={{ uri: profileImage }} style={styles.smallProfileImage} />
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={styles.smallProfileImage}
+                  />
                 ) : (
                   <View style={styles.smallIconPlaceholder}>
                     <User size={25} color="#fff" />
@@ -149,20 +226,21 @@ const LectuerProfileScreen = ({ navigation }) => {
           </View>
           <View style={styles.signInLinkContainer}>
             <Text style={styles.signInText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
               <Text style={styles.signInLink}>Log In</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardAvoidingView}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-        >
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
           {/* Form Section - now touches bottom */}
           <View style={styles.formContainer}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}>
               <Text style={styles.sectionTitle}>Personal Information</Text>
               {/* Name Fields Group */}
               <View style={styles.nameFieldsGroup}>
@@ -210,7 +288,9 @@ const LectuerProfileScreen = ({ navigation }) => {
                     autoCorrect={false}
                   />
                 </View>
-                <Text style={styles.helperText}>This will be used for account verification</Text>
+                <Text style={styles.helperText}>
+                  This will be used for account verification
+                </Text>
               </View>
 
               {/* Phone Number Field */}
@@ -261,10 +341,21 @@ const LectuerProfileScreen = ({ navigation }) => {
               {/* Bio Field */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.inputLabel}>Professional Bio</Text>
-                <View style={[styles.inputContainer, { height: 120, alignItems: "flex-start", paddingTop: 12 }]}>
-                  <Info size={20} color="#888" style={[styles.inputIcon, { marginTop: 0 }]} />
+                <View
+                  style={[
+                    styles.inputContainer,
+                    { height: 120, alignItems: 'flex-start', paddingTop: 12 },
+                  ]}>
+                  <Info
+                    size={20}
+                    color="#888"
+                    style={[styles.inputIcon, { marginTop: 0 }]}
+                  />
                   <TextInput
-                    style={[styles.input, { height: 100, textAlignVertical: "top" }]}
+                    style={[
+                      styles.input,
+                      { height: 100, textAlignVertical: 'top' },
+                    ]}
                     placeholder="Share your professional background and expertise"
                     placeholderTextColor="#888"
                     multiline
@@ -272,7 +363,9 @@ const LectuerProfileScreen = ({ navigation }) => {
                     onChangeText={setBio}
                   />
                 </View>
-                <Text style={styles.helperText}>This will be visible to students and colleagues</Text>
+                <Text style={styles.helperText}>
+                  This will be visible to students and colleagues
+                </Text>
               </View>
 
               {/* Set Password Field */}
@@ -287,8 +380,14 @@ const LectuerProfileScreen = ({ navigation }) => {
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}
                   />
-                  <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
-                    {showPassword ? <EyeOff size={20} color="#888" /> : <Eye size={20} color="#888" />}
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword(!showPassword)}>
+                    {showPassword ? (
+                      <EyeOff size={20} color="#888" />
+                    ) : (
+                      <Eye size={20} color="#888" />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -307,30 +406,44 @@ const LectuerProfileScreen = ({ navigation }) => {
                   />
                   <TouchableOpacity
                     style={styles.eyeButton}
-                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff size={20} color="#888" /> : <Eye size={20} color="#888" />}
+                    onPress={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }>
+                    {showConfirmPassword ? (
+                      <EyeOff size={20} color="#888" />
+                    ) : (
+                      <Eye size={20} color="#888" />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Terms and Conditions Checkbox */}
-              <TouchableOpacity style={styles.termsCheckboxContainer} onPress={() => setTermsAgreed(!termsAgreed)}>
-                <View style={[styles.checkbox, termsAgreed && styles.checkboxChecked]}>
+              <TouchableOpacity
+                style={styles.termsCheckboxContainer}
+                onPress={() => setTermsAgreed(!termsAgreed)}>
+                <View
+                  style={[
+                    styles.checkbox,
+                    termsAgreed && styles.checkboxChecked,
+                  ]}>
                   {termsAgreed && <Check size={16} color="#fff" />}
                 </View>
                 <Text style={styles.termsText}>
-                  By marking this checkbox, you agree to our <Text style={styles.termsLink}>Terms and Conditions</Text>
+                  By marking this checkbox, you agree to our{' '}
+                  <Text style={styles.termsLink}>Terms and Conditions</Text>
                 </Text>
               </TouchableOpacity>
 
               {/* Sign Up Button (now inside ScrollView) */}
               <View style={styles.buttonContainer}>
                 <TouchableOpacity
-                  style={[styles.registerButton, isButtonDisabled && styles.registerButtonDisabled]}
+                  style={[
+                    styles.registerButton,
+                    isButtonDisabled && styles.registerButtonDisabled,
+                  ]}
                   onPress={handleRegister}
-                  disabled={isButtonDisabled}
-                >
+                  disabled={isButtonDisabled}>
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
@@ -343,14 +456,14 @@ const LectuerProfileScreen = ({ navigation }) => {
         </KeyboardAvoidingView>
       </BlurView>
     </ImageBackground>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
   blurOverlay: {
     flex: 1,
@@ -362,10 +475,10 @@ const styles = StyleSheet.create({
   topBar: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    paddingTop:  Platform.OS === "ios" ? 0 : 60,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 0 : 60,
   },
   backButton: {
     // No absolute positioning here, part of topBar flex
@@ -374,13 +487,13 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
   },
   profileImageWrapper: {
-    position: "relative",
+    position: 'relative',
     width: 80, // Consistent size with student screen
     height: 80, // Consistent size with student screen
     borderRadius: 40, // Half of width/height for circle
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 10,
   },
   smallProfileImage: {
@@ -388,90 +501,90 @@ const styles = StyleSheet.create({
     height: 60, // Consistent size with student screen
     borderRadius: 30, // Half of width/height for circle
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: '#fff',
   },
   smallIconPlaceholder: {
     width: 70, // Consistent size with student screen
     height: 70, // Consistent size with student screen
     borderRadius: 35, // Half of width/height for circle
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   smallAddButton: {
-    position: "absolute",
+    position: 'absolute',
     bottom: -5,
     right: -5,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     width: 30, // Consistent size with student screen
     height: 30, // Consistent size with student screen
     borderRadius: 15, // Half of width/height for circle
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#000",
+    borderColor: '#000',
   },
   smallAddButtonText: {
-    color: "#000",
+    color: '#000',
     fontSize: 16, // Consistent size with student screen
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
   headerContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-    marginTop: Platform.OS === "ios" ? 20 : StatusBar.currentHeight - 20
+    marginTop: Platform.OS === 'ios' ? 20 : StatusBar.currentHeight - 20,
   },
   headerTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
   },
   headerTitle: {
     fontSize: 32, // Smaller font size
-    fontWeight: "bold",
-    color: "#fff",
+    fontWeight: 'bold',
+    color: '#fff',
     lineHeight: 36,
-    width: "60%",
+    width: '60%',
   },
   signInLinkContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
   },
   signInText: {
     fontSize: 16,
-    color: "rgba(255,255,255,0.7)",
+    color: 'rgba(255,255,255,0.7)',
   },
   signInLink: {
     fontSize: 16,
-    color: "#fff",
-    fontWeight: "bold",
-    textDecorationLine: "underline",
+    color: '#fff',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   formContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     flex: 1, // Allow form to expand and push to bottom
     paddingTop: 30,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === "ios" ? 0 : 20,
+    paddingBottom: Platform.OS === 'ios' ? 0 : 20,
   },
   scrollContent: {
     flexGrow: 1, // Allow ScrollView content to grow
     paddingBottom: 20, // Add padding at the bottom of scrollable content
   },
   nameFieldsGroup: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
   inputWrapperHalf: {
-    width: "48%",
+    width: '48%',
     marginBottom: 20,
   },
   inputWrapper: {
@@ -479,17 +592,17 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 16,
-    color: "#333", // Changed to black for white form background
+    color: '#333', // Changed to black for white form background
     marginBottom: 8,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5", // Changed to light gray for white form background
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5', // Changed to light gray for white form background
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E0E0E0", // Changed to light gray for white form background
+    borderColor: '#E0E0E0', // Changed to light gray for white form background
     height: 55,
     paddingHorizontal: 15,
   },
@@ -498,41 +611,41 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: "#333", // Changed to black for white form background
+    color: '#333', // Changed to black for white form background
     fontSize: 16,
-    height: "100%",
+    height: '100%',
   },
   passwordInput: {
     flex: 1,
-    color: "#333",
+    color: '#333',
     fontSize: 16,
-    height: "100%",
+    height: '100%',
     paddingRight: 40, // Make space for eye icon
   },
   eyeButton: {
-    position: "absolute",
+    position: 'absolute',
     right: 15,
     padding: 5,
   },
   helperText: {
     fontSize: 12,
-    color: "#777", // Changed to darker gray for white form background
+    color: '#777', // Changed to darker gray for white form background
     marginTop: 5,
     marginLeft: 5,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    color: "#333", // Changed to black for white form background
+    fontWeight: 'bold',
+    color: '#333', // Changed to black for white form background
     marginBottom: 15,
     marginTop: 10,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0", // Changed to light gray for white form background
+    borderBottomColor: '#E0E0E0', // Changed to light gray for white form background
   },
   termsCheckboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 30,
     marginTop: 10,
   },
@@ -541,52 +654,52 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#000", // Black border
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: '#000', // Black border
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 10,
   },
   checkboxChecked: {
-    backgroundColor: "#000", // Black background when checked
-    borderColor: "#000",
+    backgroundColor: '#000', // Black background when checked
+    borderColor: '#000',
   },
   termsText: {
     flex: 1,
     fontSize: 14,
-    color: "#555",
+    color: '#555',
     lineHeight: 20,
   },
   termsLink: {
-    color: "#000", // Black link
-    fontWeight: "600",
-    textDecorationLine: "underline",
+    color: '#000', // Black link
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   buttonContainer: {
     paddingHorizontal: 0,
     marginTop: 20,
-    marginBottom: Platform.OS === "ios" ? 20 : 0,
+    marginBottom: Platform.OS === 'ios' ? 20 : 0,
   },
   registerButton: {
-    backgroundColor: "#000", // Black button
+    backgroundColor: '#000', // Black button
     paddingVertical: 16,
     borderRadius: 30, // Rounded button
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   registerButtonDisabled: {
-    backgroundColor: "#000", // Darker gray for disabled state
+    backgroundColor: '#000', // Darker gray for disabled state
     opacity: 0.7,
   },
   registerButtonText: {
-    color: "#fff", // White text
+    color: '#fff', // White text
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
   },
-})
+});
 
-export default LectuerProfileScreen
+export default LectuerProfileScreen;

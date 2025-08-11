@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+"use client"
+
+import { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -13,113 +15,205 @@ import {
   Alert,
   KeyboardAvoidingView,
   SafeAreaView,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
+} from "react-native"
+import Icon from "react-native-vector-icons/MaterialIcons"
+import { LinearGradient } from "expo-linear-gradient"
+import * as ImagePicker from "expo-image-picker"
+import { FIREBASE_AUTH, FIRESTORE_DB, FIREBASE_STORAGE } from "../../firebaseConfig"
+import { onAuthStateChanged } from "firebase/auth"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 const PersonalInfoScreen = ({ navigation, route }) => {
-  // Get user data from route params or use default values
-  const initialUser = route.params?.user || {
-    name: 'Alex Johnson',
-    email: 'alex.johnson@example.com',
-    profilePicture: 'https://i.pravatar.cc/150?img=12',
-    firstName: 'Alex',
-    lastName: 'Johnson',
-    institution: 'University of Technology',
-    institutionId: 'UT12345',
-    bio: 'Software developer with a passion for mobile apps and AI.',
-  };
+  const [currentUser, setCurrentUser] = useState(null)
+  const [userType, setUserType] = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  const [firstName, setFirstName] = useState(initialUser.firstName);
-  const [lastName, setLastName] = useState(initialUser.lastName);
-  const [email, setEmail] = useState(initialUser.email);
-  const [institution, setInstitution] = useState(initialUser.institution);
-  const [institutionId, setInstitutionId] = useState(initialUser.institutionId);
-  const [bio, setBio] = useState(initialUser.bio);
-  const [profilePicture, setProfilePicture] = useState(initialUser.profilePicture);
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [institution, setInstitution] = useState("")
+  const [institutionId, setInstitutionId] = useState("")
+  const [bio, setBio] = useState("")
+  const [profilePicture, setProfilePicture] = useState("")
+  const [workEmail, setWorkEmail] = useState("")
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, async (firebaseUser) => {
+      if (firebaseUser) {
+        setCurrentUser(firebaseUser)
+        await loadUserData(firebaseUser)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const loadUserData = async (user) => {
+    try {
+      console.log("Loading user data for UID:", user.uid)
+
+      // Check lecturers collection first
+      const lecturerDoc = await getDoc(doc(FIRESTORE_DB, "lecturers", user.uid))
+
+      if (lecturerDoc.exists()) {
+        const userData = lecturerDoc.data()
+        console.log("Found lecturer data:", userData)
+
+        setUserType("lecturer")
+        setFirstName(userData.firstName || "")
+        setLastName(userData.lastName || "")
+        setEmail(userData.workEmail || userData.email || "")
+        setInstitution(userData.institution || "")
+        setInstitutionId(userData.workId || "")
+        setBio(userData.bio || "")
+        setProfilePicture(userData.profileImageUrl || "")
+        setWorkEmail(userData.workEmail || "")
+        return
+      }
+
+      // Check students collection
+      const studentDoc = await getDoc(doc(FIRESTORE_DB, "students", user.uid))
+
+      if (studentDoc.exists()) {
+        const userData = studentDoc.data()
+        console.log("Found student data:", userData)
+
+        setUserType("student")
+        setFirstName(userData.firstName || "")
+        setLastName(userData.lastName || "")
+        setEmail(userData.email || "")
+        setInstitution(userData.institution || "")
+        setInstitutionId(userData.studentId || "")
+        setBio(userData.bio || "")
+        setProfilePicture(userData.profileImageUrl || "")
+        setWorkEmail("")
+      } else {
+        console.log("No user data found in either collection")
+        Alert.alert("Error", "User data not found")
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error)
+      Alert.alert("Error", "Failed to load user data")
+    }
+  }
 
   // Request permission for accessing the photo library
   useEffect(() => {
-    (async () => {
-      if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to change your profile picture.');
+    ;(async () => {
+      if (Platform.OS !== "web") {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+        if (status !== "granted") {
+          Alert.alert("Permission Denied", "Sorry, we need camera roll permissions to change your profile picture.")
         }
       }
-    })();
-  }, []);
+    })()
+  }, [])
 
   // Function to pick an image from the gallery
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
     if (permissionResult.granted === false) {
-      Alert.alert("Permission Required", "You need to allow access to your photos to select an image.");
-      return;
+      Alert.alert("Permission Required", "You need to allow access to your photos to select an image.")
+      return
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
-    });
+    })
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfilePicture(result.assets[0].uri);
+      setProfilePicture(result.assets[0].uri)
     }
-  };
+  }
 
-  // Function to save changes
-  const saveChanges = () => {
+  const uploadProfilePicture = async (uri) => {
+    if (!uri || !currentUser) return null
+
+    try {
+      const response = await fetch(uri)
+      const blob = await response.blob()
+
+      const storageRef = ref(FIREBASE_STORAGE, `profile_pictures/${currentUser.uid}`)
+      await uploadBytes(storageRef, blob)
+
+      const downloadURL = await getDownloadURL(storageRef)
+      return downloadURL
+    } catch (error) {
+      console.error("Error uploading profile picture:", error)
+      throw error
+    }
+  }
+
+  const saveChanges = async () => {
     if (!firstName || !lastName || !email || !institution || !institutionId || !bio) {
-      Alert.alert("Missing Information", "Please fill out all required fields.");
-      return;
+      Alert.alert("Missing Information", "Please fill out all required fields.")
+      return
     }
 
-    if (!profilePicture) {
-      Alert.alert("Add Avatar", "We recommend using a picture of your face.");
-      return;
+    if (!currentUser || !userType) {
+      Alert.alert("Error", "User authentication error. Please try again.")
+      return
     }
 
-    const updatedUser = {
-      name: `${firstName} ${lastName}`,
-      email: email,
-      profilePicture: profilePicture,
-      firstName: firstName,
-      lastName: lastName,
-      institution: institution,
-      institutionId: institutionId,
-      bio: bio,
-    };
-    
-    // Pass updated user back to the settings screen
-    navigation.navigate('Settings', { updatedUser });
-    
-    // Show success message
-    Alert.alert('Success', 'Your personal information has been updated.');
-  };
+    setLoading(true)
+
+    try {
+      let profileImageUrl = profilePicture
+
+      // Upload new profile picture if it's a local URI
+      if (profilePicture && profilePicture.startsWith("file://")) {
+        profileImageUrl = await uploadProfilePicture(profilePicture)
+      }
+
+      // Prepare update data based on user type
+      const updateData = {
+        firstName,
+        lastName,
+        institution,
+        bio,
+        profileImageUrl,
+      }
+
+      // Add type-specific fields
+      if (userType === "student") {
+        updateData.studentId = institutionId
+        updateData.email = email
+      } else if (userType === "lecturer") {
+        updateData.workId = institutionId
+        updateData.workEmail = email
+        updateData.email = email // Keep both for compatibility
+      }
+
+      // Update the appropriate collection
+      const collectionName = userType === "lecturer" ? "lecturers" : "students"
+      await updateDoc(doc(FIRESTORE_DB, collectionName, currentUser.uid), updateData)
+
+      // Navigate back to settings
+      navigation.goBack()
+
+      // Show success message
+      Alert.alert("Success", "Your personal information has been updated.")
+    } catch (error) {
+      console.error("Error saving user data:", error)
+      Alert.alert("Error", "Failed to save changes. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <ImageBackground
-      source={require('../../assets/globe.jpg')}
-      style={styles.backgroundImage}>
-      <LinearGradient
-        colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)", "rgba(0,0,0,0.9)"]}
-        style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="transparent"
-          translucent
-        />
+    <ImageBackground source={require("../../assets/globe.jpg")} style={styles.backgroundImage}>
+      <LinearGradient colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)", "rgba(0,0,0,0.9)"]} style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <Icon name="arrow-back" size={30} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.headerText}>Personal Information</Text>
@@ -128,11 +222,9 @@ const PersonalInfoScreen = ({ navigation, route }) => {
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}>
-            <ScrollView 
-              showsVerticalScrollIndicator={false} 
-              contentContainerStyle={styles.scrollContent}>
-              
+            keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+          >
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
               {/* Profile Section */}
               <View style={styles.profileSection}>
                 <View style={styles.profileImageWrapper}>
@@ -158,12 +250,7 @@ const PersonalInfoScreen = ({ navigation, route }) => {
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>First Name</Text>
                   <View style={styles.inputContainer}>
-                    <Icon
-                      name="person-outline"
-                      size={20}
-                      color="rgba(255,255,255,0.7)"
-                      style={styles.inputIcon}
-                    />
+                    <Icon name="person-outline" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="Enter your first name"
@@ -177,12 +264,7 @@ const PersonalInfoScreen = ({ navigation, route }) => {
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>Last Name</Text>
                   <View style={styles.inputContainer}>
-                    <Icon
-                      name="person-outline"
-                      size={20}
-                      color="rgba(255,255,255,0.7)"
-                      style={styles.inputIcon}
-                    />
+                    <Icon name="person-outline" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="Enter your last name"
@@ -194,17 +276,12 @@ const PersonalInfoScreen = ({ navigation, route }) => {
                 </View>
 
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>Email</Text>
+                  <Text style={styles.inputLabel}>{userType === "lecturer" ? "Work Email" : "Email"}</Text>
                   <View style={styles.inputContainer}>
-                    <Icon 
-                      name="mail-outline" 
-                      size={20} 
-                      color="rgba(255,255,255,0.7)" 
-                      style={styles.inputIcon} 
-                    />
+                    <Icon name="mail-outline" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Enter your email"
+                      placeholder={userType === "lecturer" ? "Enter your work email" : "Enter your email"}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={email}
                       onChangeText={setEmail}
@@ -221,12 +298,7 @@ const PersonalInfoScreen = ({ navigation, route }) => {
                 <View style={styles.inputWrapper}>
                   <Text style={styles.inputLabel}>Institution</Text>
                   <View style={styles.inputContainer}>
-                    <Icon
-                      name="business"
-                      size={20}
-                      color="rgba(255,255,255,0.7)"
-                      style={styles.inputIcon}
-                    />
+                    <Icon name="business" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="Enter your institution name"
@@ -239,17 +311,12 @@ const PersonalInfoScreen = ({ navigation, route }) => {
 
                 {/* Institution ID Field */}
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>Institution ID</Text>
+                  <Text style={styles.inputLabel}>{userType === "lecturer" ? "Work ID" : "Student ID"}</Text>
                   <View style={styles.inputContainer}>
-                    <Icon 
-                      name="badge" 
-                      size={20} 
-                      color="rgba(255,255,255,0.7)" 
-                      style={styles.inputIcon} 
-                    />
+                    <Icon name="badge" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Enter your institution ID"
+                      placeholder={`Enter your ${userType === "lecturer" ? "work" : "student"} ID`}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={institutionId}
                       onChangeText={setInstitutionId}
@@ -282,8 +349,12 @@ const PersonalInfoScreen = ({ navigation, route }) => {
 
               {/* Save Button */}
               <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.saveButton} onPress={saveChanges}>
-                  <Text style={styles.saveButtonText}>Save Profile</Text>
+                <TouchableOpacity
+                  style={[styles.saveButton, loading && { opacity: 0.7 }]}
+                  onPress={saveChanges}
+                  disabled={loading}
+                >
+                  <Text style={styles.saveButtonText}>{loading ? "Saving..." : "Save Profile"}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -291,8 +362,8 @@ const PersonalInfoScreen = ({ navigation, route }) => {
         </SafeAreaView>
       </LinearGradient>
     </ImageBackground>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   backgroundImage: {
@@ -314,7 +385,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
+    paddingTop: Platform.OS === "ios" ? 20 : 40,
   },
   backButton: {
     marginRight: 15,
@@ -384,7 +455,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.2)",
+    borderBottomColor: "rgba(255, 255, 255, 0.2)",
   },
   inputWrapper: {
     marginBottom: 20,
@@ -441,6 +512,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
-});
+})
 
-export default PersonalInfoScreen;
+export default PersonalInfoScreen

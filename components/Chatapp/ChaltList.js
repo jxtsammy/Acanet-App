@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginTop: Platform.OS === "ios" ? 120 : StatusBar.currentHeight + 40,
+    marginTop: Platform.OS === "ios" ? 100 : StatusBar.currentHeight + 40,
   },
   searchContainer: {
     flexDirection: "row",

@@ -17,6 +17,8 @@ import {
 } from "react-native"
 import { BlurView } from "expo-blur"
 import { Eye, EyeOff } from "lucide-react-native"
+import { signInWithEmailAndPassword } from "firebase/auth"
+import { FIREBASE_AUTH } from "../../firebaseConfig"
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window")
 
@@ -26,54 +28,62 @@ const SignInScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState(null)
+  const auth = FIREBASE_AUTH
 
   const dismissKeyboard = () => {
     Keyboard.dismiss()
   }
 
   const handleSignIn = async () => {
+    setErrorMessage(null)
     if (!email.trim() || !password.trim()) {
-      alert("Please enter both email and password.")
+      setErrorMessage("Please enter both email and password.")
       return
     }
-
     setIsLoading(true)
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      // Simulate successful login
-      const loginSuccess = true // Change to false to test error handling
-
-      if (loginSuccess) {
-        navigation.navigate("Home")
-      } else {
-        alert("Login failed. Please check your credentials.")
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      navigation.navigate("Home")
+    } catch (error) {
+      console.error("Firebase Sign-In Error:", error.code, error.message)
+      switch (error.code) {
+        case "auth/invalid-email":
+        case "auth/user-not-found":
+        case "auth/wrong-password":
+          setErrorMessage("Invalid email or password.")
+          break
+        case "auth/invalid-credential":
+          setErrorMessage("Invalid email or password.")
+          break
+        case "auth/too-many-requests":
+          setErrorMessage("Too many login attempts. Please try again later.")
+          break
+        default:
+          setErrorMessage("Login failed. Please try again.")
+          break
       }
-    }, 2000) // Simulate 2-second login process
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const isButtonDisabled = isLoading || !email.trim() || !password.trim()
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0} // Adjust offset if needed
+    >
       <StatusBar barStyle="light-content" />
-
-      {/* Background Image and Blur Overlay */}
-      <ImageBackground
-        source={require("../../assets/globe.jpg")} // Replace with your actual image path
-        style={styles.backgroundImage}
-      >
+      <ImageBackground source={require("../../assets/globe.jpg")} style={styles.backgroundImage}>
         <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
       </ImageBackground>
-
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
-        {/* Replaced ScrollView with a View */}
-        <View
-          style={styles.contentWrapper} // New style for the main content wrapper
-        >
+        <View style={styles.contentWrapper}>
           {/* Header Section */}
           <View style={styles.headerSection}>
-            {/* Title */}
             <View style={styles.titleContainer}>
               <Text style={styles.title}>Sign in to your{"\n"}Account</Text>
               <View style={styles.signUpContainer}>
@@ -84,11 +94,14 @@ const SignInScreen = ({ navigation }) => {
               </View>
             </View>
           </View>
-          {/* Form Section - now touches sides */}
+          {/* Form Section */}
           <View style={styles.formSection}>
-            {/* Content inside form section now has padding */}
             <View style={styles.formContentWrapper}>
-              {/* Email Input */}
+              {errorMessage && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Email</Text>
                 <TextInput
@@ -101,8 +114,6 @@ const SignInScreen = ({ navigation }) => {
                   autoCapitalize="none"
                 />
               </View>
-
-              {/* Password Input */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <View style={styles.passwordContainer}>
@@ -119,8 +130,6 @@ const SignInScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Remember Me & Forgot Password */}
               <View style={styles.optionsContainer}>
                 <TouchableOpacity style={styles.rememberMeContainer} onPress={() => setRememberMe(!rememberMe)}>
                   <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
@@ -132,8 +141,6 @@ const SignInScreen = ({ navigation }) => {
                   <Text style={styles.forgotPasswordText}>Forgot Password ?</Text>
                 </TouchableOpacity>
               </View>
-
-              {/* Sign In Button */}
               <TouchableOpacity
                 style={[styles.signInButton, isButtonDisabled && styles.signInButtonDisabled]}
                 onPress={handleSignIn}
@@ -145,8 +152,6 @@ const SignInScreen = ({ navigation }) => {
                   <Text style={styles.signInButtonText}>Sign In</Text>
                 )}
               </TouchableOpacity>
-
-              {/* Terms */}
               <View style={styles.termsContainer}>
                 <Text style={styles.termsText}>
                   By signing in, you agree to the <Text style={styles.termsLink}>Terms of Service</Text> and{" "}
@@ -164,7 +169,7 @@ const SignInScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1a1a2e", // Fallback background color
+    backgroundColor: "#1a1a2e",
   },
   backgroundImage: {
     position: "absolute",
@@ -173,15 +178,14 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
   contentWrapper: {
-    // New style for the main content wrapper
-    flexGrow: 1,
-    justifyContent: "space-between", // Distribute space between header and form
+    flex: 1, // Takes full height
+    justifyContent: "flex-end", // Pushes form to bottom, header to top
   },
   headerSection: {
-    paddingTop: Platform.OS === "ios" ? 230 : 240, // Adjusted padding for non-scrolling
+    flex: 0.4, // Takes 40% of available space
+    justifyContent: "flex-end", // Pushes content to the bottom of its flex container
     paddingHorizontal: 24,
-    paddingBottom: 5,
-    flexGrow:1
+    paddingBottom: 20, // Add some padding at the bottom of the header
   },
   titleContainer: {
     marginBottom: 10,
@@ -208,15 +212,33 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   formSection: {
+    flex: 0.6, // Takes 60% of available space
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 32,
     paddingBottom: 30,
-    // flex: 1, // Removed flex:1 here as contentWrapper now handles flex
+    justifyContent: "space-between", // Distribute content vertically within the form
   },
   formContentWrapper: {
     paddingHorizontal: 24,
+    flexGrow: 1, // Allows content to grow and push terms to bottom
+    justifyContent: "space-between", // Distribute content vertically
+  },
+  errorContainer: {
+    marginBottom: 24,
+    padding: 12,
+    backgroundColor: "#FFE5E5",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FF0000",
+    alignItems: "center",
+  },
+  errorText: {
+    color: "#FF0000",
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
   },
   inputGroup: {
     marginBottom: 24,
@@ -315,7 +337,7 @@ const styles = StyleSheet.create({
     }),
   },
   signInButtonDisabled: {
-    backgroundColor: "#000",
+    backgroundColor: "#000", // Keep same color, but opacity might be added by React Native
   },
   signInButtonText: {
     color: "#fff",
@@ -324,13 +346,14 @@ const styles = StyleSheet.create({
   },
   termsContainer: {
     alignItems: "center",
+    marginTop: "auto", // Pushes to the bottom of formContentWrapper
   },
   termsText: {
     fontSize: 12,
     color: "#6B7280",
     textAlign: "center",
     lineHeight: 18,
-    paddingBottom: Platform.OS === "ios" ? 0 : 40,
+    paddingBottom: Platform.OS === "ios" ? 0 : 40, // Keep original platform specific padding
   },
   termsLink: {
     color: "#000",
@@ -338,4 +361,4 @@ const styles = StyleSheet.create({
   },
 })
 
-export default SignInScreen;
+export default SignInScreen

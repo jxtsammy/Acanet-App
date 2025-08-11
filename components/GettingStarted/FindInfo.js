@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-end", 
+    justifyContent: "flex-end",
   },
   textContainer: {
     alignItems: "flex-start", // Corrected: Use 'flex-start' for left-aligned content
@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontWeight: "bold",
     lineHeight: 30,
-    marginHorizontal: 25,
-    marginBottom: 80
+    marginHorizontal:  Platform.OS === "ios" ? 15 : 10,
+    marginBottom: Platform.OS === "ios" ? 60 : 50
   },
   bottomContainer: {
     alignItems: "center",

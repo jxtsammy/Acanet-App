@@ -16,6 +16,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+
 import * as ImagePicker from 'expo-image-picker';
 import { BlurView } from 'expo-blur';
 import {
@@ -30,6 +31,19 @@ import {
   CreditCard,
   Info,
 } from 'lucide-react-native';
+
+// Import Firebase services and functions
+import {
+  FIREBASE_APP,
+  FIREBASE_AUTH,
+  FIRESTORE_DB,
+  FIREBASE_STORAGE
+} from '../../../firebaseConfig';
+
+// Import individual Firebase functions
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const RegisterScreen = ({ navigation }) => {
   const [profileImage, setProfileImage] = useState(null);
@@ -69,6 +83,7 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   const handleRegister = async () => {
+    // Client-side validation
     if (
       !firstName.trim() ||
       !lastName.trim() ||
@@ -104,24 +119,58 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      const registrationSuccess = true; // Simulate successful registration
 
-      if (registrationSuccess) {
-        Alert.alert(
-          'Registration Successful!',
-          'Your account has been created.',
-          [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-        );
-      } else {
-        Alert.alert(
-          'Registration Failed',
-          'Something went wrong. Please try again.'
-        );
+    try {
+      // 1. Create user with email and password in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        FIREBASE_AUTH,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // The profileImage state already holds the URI from the device's library.
+      // We will simply store this URI directly in Firestore without uploading
+      // it to Firebase Storage. This will save money and simplify the process.
+      // The user will need to manage image availability on their own device.
+      // If profileImage is null, profileImageUrl will be null.
+      const profileImageUrl = profileImage;
+
+      // 2. Store additional user data in Firestore
+      await setDoc(doc(FIRESTORE_DB, 'students', user.uid), {
+        firstName,
+        lastName,
+        email,
+        institution,
+        studentId,
+        bio,
+        phoneNumber,
+        profileImageUrl, // Store the local URI or null if no image was selected
+        termsAgreed,
+        createdAt: new Date(),
+      });
+
+      // 3. On successful registration, show success alert and navigate
+      Alert.alert(
+        'Registration Successful!',
+        'Your account has been created.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    } catch (error) {
+      // Handle Firebase Auth errors
+      let errorMessage = 'Something went wrong. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'That email address is already in use!';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'The password is too weak.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'That email address is invalid!';
       }
-    }, 2000); // Simulate 2-second registration process
+      Alert.alert('Registration Failed', errorMessage);
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isButtonDisabled =
@@ -140,7 +189,7 @@ const RegisterScreen = ({ navigation }) => {
 
   return (
     <ImageBackground
-      source={require('../../../assets/stbg.jpg')}
+      source={require("../../../assets/stbg.jpg")}
       style={styles.backgroundImage}>
       <BlurView intensity={90} tint="dark" style={styles.blurOverlay}>
         <StatusBar barStyle="light-content" />
@@ -422,14 +471,17 @@ const styles = StyleSheet.create({
   blurOverlay: {
     flex: 1,
   },
-
+  safeAreaForBackButton: {
+    // SafeAreaView now only wraps the topBar
+    // It will automatically handle padding for the status bar
+  },
   topBar: {
     paddingHorizontal: 20,
-    paddingVertical: 10, // Reduced padding
+    paddingVertical: 10,
     flexDirection: 'row',
-    justifyContent: 'flex-start', // Only back button here
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop:  Platform.OS === "ios" ? 0 : 60,
+    paddingTop: Platform.OS === 'ios' ? 0 : 60,
   },
   backButton: {
     // No absolute positioning here, part of topBar flex
@@ -439,8 +491,8 @@ const styles = StyleSheet.create({
   },
   profileImageWrapper: {
     position: 'relative',
-    width: 80, // Smaller size
-    height: 80, // Smaller size
+    width: 80,
+    height: 80,
     borderRadius: 60,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
@@ -467,8 +519,8 @@ const styles = StyleSheet.create({
     bottom: -5,
     right: -5,
     backgroundColor: '#fff',
-    width: 30, // Smaller add button
-    height: 30, // Smaller add button
+    width: 30,
+    height: 30,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -477,7 +529,7 @@ const styles = StyleSheet.create({
   },
   smallAddButtonText: {
     color: '#000',
-    fontSize: 16, // Smaller text
+    fontSize: 16,
     fontWeight: 'bold',
   },
   headerContent: {
@@ -492,7 +544,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   headerTitle: {
-    fontSize: 32, // Smaller font size
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
     lineHeight: 36,
@@ -520,14 +572,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    flex: 1, // Allow form to expand and push to bottom
+    flex: 1,
     paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === 'ios' ? 0 : 20,
   },
   scrollContent: {
-    flexGrow: 1, // Allow ScrollView content to grow
-    paddingBottom: 20, // Add padding at the bottom of scrollable content
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   nameFieldsGroup: {
     flexDirection: 'row',
@@ -605,13 +657,13 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#000', // Black border
+    borderColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   checkboxChecked: {
-    backgroundColor: '#000', // Black background when checked
+    backgroundColor: '#000',
     borderColor: '#000',
   },
   termsText: {
@@ -621,7 +673,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   termsLink: {
-    color: '#000', // Black link
+    color: '#000',
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
@@ -631,7 +683,7 @@ const styles = StyleSheet.create({
     marginBottom: Platform.OS === 'ios' ? 20 : 0,
   },
   registerButton: {
-    backgroundColor: '#000', // Black button
+    backgroundColor: '#000',
     paddingVertical: 16,
     borderRadius: 30,
     alignItems: 'center',

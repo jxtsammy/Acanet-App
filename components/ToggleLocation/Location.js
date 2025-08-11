@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -21,7 +22,7 @@ const LocationPermissionScreen = ({navigation}) => {
     }else{
       alert('Please turn on location or skip')
     }
-     
+
   }
 
   return (
@@ -33,6 +34,7 @@ const LocationPermissionScreen = ({navigation}) => {
           resizeMode="contain"
         />
         <Text style={styles.title}>Our App would like to access your location for user discovery</Text>
+        <StatusBar barStyle={"dark-content"} backgroundColor="transparent" />
       </View>
 
       <TouchableOpacity

@@ -1,6 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { FIREBASE_AUTH, FIRESTORE_DB } from "../../firebaseConfig"
+import { signOut, deleteUser, onAuthStateChanged } from "firebase/auth"
+import { doc, getDoc, deleteDoc } from "firebase/firestore"
+import { CommonActions } from "@react-navigation/native"
 
 import {
   View,
@@ -23,36 +27,137 @@ import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
 
 const SettingsScreen = ({ navigation, route }) => {
-  // User data - in a real app, this would come from your auth/user context
   const [user, setUser] = useState({
-    name: "Alex Johnson",
-    email: "alex.johnson@example.com",
-    profilePicture: "https://i.pravatar.cc/150?img=12",
-    firstName: "Alex",
-    lastName: "Johnson",
-    institution: "University of Technology",
-    institutionId: "UT12345",
-    bio: "Software developer with a passion for mobile apps and AI.",
+    name: "",
+    email: "",
+    profilePicture: null, // Set default to null instead of placeholder image
+    firstName: "",
+    lastName: "",
+    institution: "",
+    institutionId: "",
+    bio: "",
+    userType: null, // Store user type for future reference
+    workEmail: "",
+    workId: "",
   })
 
-  // Update user data if coming back from PersonalInfoScreen
+  const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState(null)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, async (firebaseUser) => {
+      if (firebaseUser) {
+        setCurrentUser(firebaseUser)
+        console.log("Current user UID:", firebaseUser.uid)
+
+        try {
+          let userData = null
+          let userType = null
+
+          // First check lecturers collection
+          console.log("Checking lecturers collection for UID:", firebaseUser.uid)
+          const lecturerDoc = await getDoc(doc(FIRESTORE_DB, "lecturers", firebaseUser.uid))
+          if (lecturerDoc.exists()) {
+            userData = lecturerDoc.data()
+            userType = "lecturer"
+            console.log("Found user in lecturers collection:", userData)
+          } else {
+            console.log("User not found in lecturers collection")
+            // If not found in lecturer, check student collection
+            console.log("Checking students collection for UID:", firebaseUser.uid)
+            const studentDoc = await getDoc(doc(FIRESTORE_DB, "students", firebaseUser.uid))
+            if (studentDoc.exists()) {
+              userData = studentDoc.data()
+              userType = "student"
+              console.log("Found user in students collection:", userData)
+            } else {
+              console.log("User not found in students collection either")
+            }
+          }
+
+          if (userData) {
+            console.log("Processing user data - firstName:", userData.firstName, "lastName:", userData.lastName)
+            const fullName =
+              userData.firstName && userData.lastName
+                ? `${userData.firstName} ${userData.lastName}`.trim()
+                : userData.firstName || userData.lastName || ""
+
+            console.log("Final processed name:", fullName)
+
+            setUser({
+              name: userData.displayName || fullName || firebaseUser.displayName || "User",
+              email: firebaseUser.email || "",
+              profilePicture: userData.profileImageUrl || firebaseUser.photoURL || null, // Use null as fallback instead of placeholder image
+              firstName: userData.firstName || "",
+              lastName: userData.lastName || "",
+              institution: userData.institution || "",
+              institutionId: userData.studentId || userData.workId || "",
+              bio: userData.bio || "",
+              userType: userType,
+              workEmail: userData.workEmail || "",
+              workId: userData.workId || "",
+            })
+          } else {
+            console.warn("No user data found in either lecturers or students collections for UID:", firebaseUser.uid)
+            setUser({
+              name: firebaseUser.displayName || "User",
+              email: firebaseUser.email || "",
+              profilePicture: firebaseUser.photoURL || null, // Use null as fallback instead of placeholder image
+              firstName: "",
+              lastName: "",
+              institution: "",
+              institutionId: "",
+              bio: "",
+              userType: "",
+              workEmail: "",
+              workId: "",
+            })
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error)
+          console.error("Error details - UID:", firebaseUser.uid, "Error message:", error.message)
+          setUser({
+            name: firebaseUser.displayName || "User",
+            email: firebaseUser.email || "",
+            profilePicture: firebaseUser.photoURL || null, // Use null as fallback instead of placeholder image
+            firstName: "",
+            lastName: "",
+            institution: "",
+            institutionId: "",
+            bio: "",
+            userType: "",
+            workEmail: "",
+            workId: "",
+          })
+        }
+        setLoading(false)
+      } else {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: "Login" }],
+          }),
+        )
+      }
+    })
+
+    return () => unsubscribe()
+  }, [navigation])
+
   useEffect(() => {
     if (route.params?.updatedUser) {
       setUser(route.params.updatedUser)
     }
   }, [route.params?.updatedUser])
 
-  // Settings states
   const [notifications, setNotifications] = useState(true)
   const [emailNotifications, setEmailNotifications] = useState(false)
   const [biometricAuth, setBiometricAuth] = useState(true)
   const [dataSync, setDataSync] = useState(true)
 
-  // Modal states
   const [deleteModalVisible, setDeleteModalVisible] = useState(false)
   const [modalAnimation] = useState(new Animated.Value(0))
 
-  // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours()
     if (hour < 12) return "Good morning"
@@ -60,12 +165,10 @@ const SettingsScreen = ({ navigation, route }) => {
     return "Good evening"
   }
 
-  // Navigate to personal info screen
   const navigateToPersonalInfo = () => {
     navigation.navigate("PersonalInfo", { user })
   }
 
-  // Show delete account modal
   const showDeleteModal = () => {
     setDeleteModalVisible(true)
     Animated.spring(modalAnimation, {
@@ -76,7 +179,6 @@ const SettingsScreen = ({ navigation, route }) => {
     }).start()
   }
 
-  // Hide delete account modal
   const hideDeleteModal = () => {
     Animated.timing(modalAnimation, {
       toValue: 0,
@@ -87,21 +189,39 @@ const SettingsScreen = ({ navigation, route }) => {
     })
   }
 
-  // Handle account deletion
-  const handleDeleteAccount = () => {
+  const confirmDeleteAccount = async () => {
     hideDeleteModal()
-    // Add a small delay to let the modal close
-    setTimeout(() => {
-      Alert.alert("Account Deleted", "Your account has been permanently deleted.", [
-        {
-          text: "OK",
-          onPress: () => navigation.navigate("Login"),
-        },
-      ])
-    }, 300)
+
+    try {
+      if (currentUser) {
+        if (user.userType === "lecturer") {
+          await deleteDoc(doc(FIRESTORE_DB, "lecturers", currentUser.uid))
+        } else if (user.userType === "student") {
+          await deleteDoc(doc(FIRESTORE_DB, "students", currentUser.uid))
+        }
+
+        await deleteUser(currentUser)
+
+        Alert.alert("Account Deleted", "Your account has been permanently deleted.", [
+          {
+            text: "OK",
+            onPress: () => {
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                }),
+              )
+            },
+          },
+        ])
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error)
+      Alert.alert("Error", "Failed to delete account. Please try again.")
+    }
   }
 
-  // Handle logout
   const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
       {
@@ -111,12 +231,39 @@ const SettingsScreen = ({ navigation, route }) => {
       {
         text: "Log Out",
         style: "destructive",
-        onPress: () => navigation.navigate("Login"),
+        onPress: async () => {
+          try {
+            await signOut(FIREBASE_AUTH)
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              }),
+            )
+          } catch (error) {
+            console.error("Error signing out:", error)
+            Alert.alert("Error", "Failed to sign out. Please try again.")
+          }
+        },
       },
     ])
   }
 
-  // Render a settings item with an icon
+  if (loading) {
+    return (
+      <ImageBackground source={require("../../assets/settingsbg.jpg")} style={styles.backgroundImage}>
+        <LinearGradient
+          colors={["rgba(0, 0, 0, 0.5)", "rgba(0, 0, 0, 0.9)", "rgba(0, 0, 0, 0.95)"]}
+          style={styles.overlay}
+        >
+          <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+            <Text style={styles.userName}>Loading...</Text>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
+    )
+  }
+
   const renderSettingsItem = ({
     icon,
     title,
@@ -149,39 +296,47 @@ const SettingsScreen = ({ navigation, route }) => {
   )
 
   return (
-    <ImageBackground
-      source={require("../../assets/settingsbg.jpg")}
-      style={styles.backgroundImage}
-    >
+    <ImageBackground source={require("../../assets/settingsbg.jpg")} style={styles.backgroundImage}>
       <LinearGradient
         colors={["rgba(0, 0, 0, 0.5)", "rgba(0, 0, 0, 0.9)", "rgba(0, 0, 0, 0.95)"]}
         style={styles.overlay}
       >
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Settings</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* User Profile Section */}
           <View style={styles.profileContainer}>
             <View style={styles.profileInfo}>
               <Text style={styles.greeting}>{getGreeting()}</Text>
               <Text style={styles.userName}>{user.name}</Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
+              {user.userType === "lecturer" ? (
+                <>
+                  <Text style={styles.userEmail}>{user.workEmail || user.email}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.userEmail}>{user.email}</Text>
+                </>
+              )}
             </View>
             <TouchableOpacity style={styles.profileImageContainer} onPress={navigateToPersonalInfo}>
-              <Image source={{ uri: user.profilePicture }} style={styles.profileImage} />
+              {user.profilePicture ? (
+                <Image source={{ uri: user.profilePicture }} style={styles.profileImage} />
+              ) : (
+                <View style={[styles.profileImage, styles.defaultProfileIcon]}>
+                  <Icon name="person" size={50} color="#fff" />
+                </View>
+              )}
               <View style={styles.editIconContainer}>
                 <Icon name="edit" size={16} color="#fff" />
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* Account Settings */}
           <BlurView style={styles.settingsSection}>
             <Text style={styles.settingsSectionTitle}>Account</Text>
             {renderSettingsItem({
@@ -204,7 +359,6 @@ const SettingsScreen = ({ navigation, route }) => {
             })}
           </BlurView>
 
-          {/* Preferences */}
           <BlurView style={styles.settingsSection}>
             <Text style={styles.settingsSectionTitle}>Preferences</Text>
             {renderSettingsItem({
@@ -217,7 +371,6 @@ const SettingsScreen = ({ navigation, route }) => {
             })}
           </BlurView>
 
-          {/* Notifications */}
           <BlurView style={styles.settingsSection}>
             <Text style={styles.settingsSectionTitle}>Notifications</Text>
             {renderSettingsItem({
@@ -238,7 +391,6 @@ const SettingsScreen = ({ navigation, route }) => {
             })}
           </BlurView>
 
-          {/* Security */}
           <BlurView style={styles.settingsSection}>
             <Text style={styles.settingsSectionTitle}>Security</Text>
             {renderSettingsItem({
@@ -257,7 +409,6 @@ const SettingsScreen = ({ navigation, route }) => {
             })}
           </BlurView>
 
-          {/* Support */}
           <BlurView style={styles.settingsSection}>
             <Text style={styles.settingsSectionTitle}>Support</Text>
             {renderSettingsItem({
@@ -280,7 +431,6 @@ const SettingsScreen = ({ navigation, route }) => {
             })}
           </BlurView>
 
-          {/* Logout Section - No category title */}
           <BlurView style={styles.settingsSection}>
             {renderSettingsItem({
               icon: "logout",
@@ -296,24 +446,17 @@ const SettingsScreen = ({ navigation, route }) => {
           </View>
         </ScrollView>
 
-        {/* Simplified Delete Account Modal */}
         <Modal visible={deleteModalVisible} transparent={true} animationType="none" onRequestClose={hideDeleteModal}>
-          <View style={styles.modalOverlay}>
+          <BlurView style={styles.modalOverlay} intensity={20} tint="dark">
             <Animated.View
               style={[
                 styles.modalContainer,
                 {
                   transform: [
                     {
-                      translateY: modalAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [300, 0],
-                      }),
-                    },
-                    {
                       scale: modalAnimation.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.9, 1],
+                        outputRange: [0.8, 1],
                       }),
                     },
                   ],
@@ -321,31 +464,23 @@ const SettingsScreen = ({ navigation, route }) => {
                 },
               ]}
             >
-              <View style={styles.modalHeader}>
-                <View style={styles.modalIconContainer}>
-                  <Icon name="warning" size={32} color="#FF4444" />
-                </View>
-                <Text style={styles.modalTitle}>Delete Account</Text>
-                <Text style={styles.modalSubtitle}>Are you sure you want to delete your account?</Text>
-              </View>
-
               <View style={styles.modalContent}>
-                <Text style={styles.modalDescription}>
-                  This action is <Text style={styles.irreversibleText}>irreversible</Text>. All your data will be
-                  permanently deleted and cannot be recovered.
+                <Icon name="warning" size={48} color="#ff4444" style={styles.modalIcon} />
+                <Text style={styles.modalTitle}>Delete Account</Text>
+                <Text style={styles.modalMessage}>
+                  Are you sure you want to permanently delete your account? This action cannot be undone.
                 </Text>
-              </View>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelButton} onPress={hideDeleteModal}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
-                  <Text style={styles.deleteButtonText}>Delete Account</Text>
-                </TouchableOpacity>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalButtonCancel} onPress={hideDeleteModal}>
+                    <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.modalButtonDelete} onPress={confirmDeleteAccount}>
+                    <Text style={styles.modalButtonTextDelete}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </Animated.View>
-          </View>
+          </BlurView>
         </Modal>
       </LinearGradient>
     </ImageBackground>
@@ -355,8 +490,7 @@ const SettingsScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
-    width: "100%",
-    height: "100%",
+    resizeMode: "cover",
   },
   overlay: {
     flex: 1,
@@ -364,207 +498,197 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 70 : 40,
-    paddingBottom: 16,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight + 20,
+    paddingBottom: 20,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#fff",
+    textAlign: "left",
+    flex: 1,
   },
   scrollView: {
     flex: 1,
+    paddingHorizontal: 20,
   },
   profileContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    padding: 20,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    marginBottom: 30,
+    paddingHorizontal: 10,
   },
   profileInfo: {
     flex: 1,
   },
   greeting: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 4,
+    fontSize: 16,
+    color: "#ccc",
+    marginBottom: 5,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#000",
-    marginBottom: 4,
+    color: "#fff",
+    marginBottom: 5,
   },
   userEmail: {
+    fontSize: 16,
+    color: "#aaa",
+  },
+  userInfo: {
     fontSize: 14,
-    color: "#666",
+    color: "#bbb",
+    marginTop: 2,
   },
   profileImageContainer: {
     position: "relative",
   },
   profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: "#088a6a",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+  defaultProfileIcon: {
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
   },
   editIconContainer: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#000",
+    backgroundColor: "#007AFF",
+    borderRadius: 12,
     width: 24,
     height: 24,
-    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },
   settingsSection: {
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
-    borderRadius: 20,
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 15,
+    marginBottom: 20,
     overflow: "hidden",
   },
   settingsSectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "600",
     color: "#fff",
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   settingsItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
   },
   settingsItemIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 15,
   },
   settingsItemText: {
     flex: 1,
   },
   settingsItemTitle: {
     fontSize: 16,
+    fontWeight: "500",
     color: "#fff",
+    marginBottom: 2,
   },
   settingsItemSubtitle: {
-    fontSize: 12,
-    color: "#bbb",
-    marginTop: 2,
+    fontSize: 14,
+    color: "#ccc",
   },
   footer: {
     alignItems: "center",
-    marginTop: 24,
-    marginBottom: 40,
-    paddingHorizontal: 16,
+    paddingVertical: 30,
   },
   footerText: {
     fontSize: 12,
-    color: "#fff",
-    marginBottom: 4,
+    color: "#888",
+    marginBottom: 5,
   },
-
-  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "flex-end",
-  },
-  modalContainer: {
-    backgroundColor: "#1E1E1E",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  modalIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255, 68, 68, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: "#ccc",
-    textAlign: "center",
+  modalContainer: {
+    margin: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 20,
+    overflow: "hidden",
   },
   modalContent: {
-    marginBottom: 32,
+    padding: 30,
+    alignItems: "center",
   },
-  modalDescription: {
-    fontSize: 16,
-    color: "#ccc",
-    lineHeight: 24,
+  modalIcon: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 15,
     textAlign: "center",
   },
-  irreversibleText: {
-    color: "#FF4444",
-    fontWeight: "bold",
+  modalMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 30,
   },
-  modalActions: {
+  modalButtons: {
     flexDirection: "row",
-    gap: 12,
+    gap: 15,
   },
-  cancelButton: {
+  modalButtonCancel: {
     flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  cancelButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  deleteButton: {
-    flex: 1,
-    backgroundColor: "#FF4444",
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: "#f0f0f0",
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 10,
     alignItems: "center",
   },
-  deleteButtonText: {
-    color: "#fff",
+  modalButtonDelete: {
+    flex: 1,
+    backgroundColor: "#ff4444",
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalButtonTextCancel: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#333",
+  },
+  modalButtonTextDelete: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  container: {
+    flex: 1,
   },
 })
 
