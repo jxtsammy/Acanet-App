@@ -1,30 +1,31 @@
 {
   "expo": {
-    "name": "acanet-app",
+    "name": "",
     "slug": "snack-c185009f-faa9-4b8d-a00f-187d5359b963",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/AcanetLogo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/AcanetLogo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "transparent"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/AcanetLogo.png",
+        "backgroundColor": "transparent",
+        "resizeMode": "contain"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.gr8akid.snackc185009ffaa94b8da00f187d5359b963"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/AcanetLogo.png"
     }
   }
 }

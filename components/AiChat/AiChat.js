@@ -1,5 +1,5 @@
 "use client"
-import { useState, useRef, useEffect } from "react" // Import useRef and useEffect
+import { useState, useRef, useEffect } from "react"
 import {
   View,
   Text,
@@ -12,12 +12,14 @@ import {
   Platform,
   KeyboardAvoidingView,
   StatusBar,
-  Animated, // Import Animated
-  ScrollView, // Import ScrollView
+  Animated,
+  ScrollView,
+  Alert,
 } from "react-native"
 import { BlurView } from "expo-blur"
 import * as ImagePicker from "expo-image-picker"
-import { ArrowLeft, CheckCircle, Paperclip, Camera, Send, ShieldCheck } from "lucide-react-native"
+import { ArrowLeft, CheckCircle, Paperclip, Send, ShieldCheck } from "lucide-react-native"
+import { generateAcademicResponse, generateAIResponseFromImage, getImageInfo } from "./services/geminiAPI"
 
 // Typing Indicator Component
 const TypingIndicator = () => {
@@ -66,8 +68,10 @@ const ChatScreen = ({ navigation }) => {
   const [inputText, setInputText] = useState("")
   const [selectedMessages, setSelectedMessages] = useState([])
   const [isSelectionMode, setIsSelectionMode] = useState(false)
-  const [isOnline, setIsOnline] = useState(true) // Online/Offline status
-  const [showPredefinedMessages, setShowPredefinedMessages] = useState(true) // State for tabs visibility
+  const [isOnline, setIsOnline] = useState(true)
+  const [showPredefinedMessages, setShowPredefinedMessages] = useState(true)
+  const [isAIThinking, setIsAIThinking] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null) // Store selected image temporarily
 
   // Predefined messages for the tabs
   const predefinedMessages = [
@@ -88,34 +92,36 @@ const ChatScreen = ({ navigation }) => {
     return true
   }
 
+  const showImagePickerOptions = () => {
+    Alert.alert("Select Image", "Choose how you want to select an image", [
+      { text: "Camera", onPress: takePhoto },
+      { text: "Gallery", onPress: pickImage },
+      { text: "Cancel", style: "cancel" },
+    ])
+  }
+
   const pickImage = async () => {
     try {
       const hasPermission = await requestPermissions()
       if (!hasPermission) {
-        alert("Sorry, we need camera roll permissions to make this work!")
+        Alert.alert("Permission Required", "Sorry, we need camera roll permissions to make this work!")
         return
       }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 1,
+        quality: 0.8,
+        allowsMultipleSelection: false,
       })
-      if (!result.canceled) {
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            id: Date.now().toString(),
-            text: "",
-            image: imageUri,
-            isSent: true,
-            time: new Date().toLocaleTimeString(),
-          },
-        ])
-        handleBotResponse() // Simulate bot response
+        await handleImageSelection(imageUri)
       }
     } catch (error) {
-      console.log("Error picking image:", error)
+      console.error("Error picking image:", error)
+      Alert.alert("Error", "Failed to pick image. Please try again.")
     }
   }
 
@@ -123,30 +129,51 @@ const ChatScreen = ({ navigation }) => {
     try {
       const hasPermission = await requestPermissions()
       if (!hasPermission) {
-        alert("Sorry, we need camera permissions to make this work!")
+        Alert.alert("Permission Required", "Sorry, we need camera permissions to make this work!")
         return
       }
+
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 1,
+        quality: 0.8,
+        aspect: [4, 3],
       })
-      if (!result.canceled) {
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            id: Date.now().toString(),
-            text: "",
-            image: imageUri,
-            isSent: true,
-            time: new Date().toLocaleTimeString(),
-          },
-        ])
-        handleBotResponse() // Simulate bot response
+        await handleImageSelection(imageUri)
       }
-      // eslint-disable-next-line no-empty
     } catch (error) {
-      console.log("Error taking photo:", error)
+      console.error("Error taking photo:", error)
+      Alert.alert("Error", "Failed to take photo. Please try again.")
+    }
+  }
+
+  const handleImageSelection = async (imageUri) => {
+    try {
+      // Get image info to validate
+      const imageInfo = await getImageInfo(imageUri)
+
+      if (!imageInfo || !imageInfo.exists) {
+        Alert.alert("Error", "Selected image could not be found.")
+        return
+      }
+
+      if (!imageInfo.isValidImage) {
+        Alert.alert("Invalid Image", "Please select a valid image file (JPG, PNG, GIF, WebP, BMP, TIFF, HEIC, HEIF).")
+        return
+      }
+
+      // Store the selected image temporarily (don't send yet)
+      setSelectedImage({
+        uri: imageUri,
+        info: imageInfo,
+      })
+
+      console.log("Image selected and ready to send:", imageUri)
+    } catch (error) {
+      console.error("Error handling image selection:", error)
+      Alert.alert("Error", "Failed to process the selected image.")
     }
   }
 
@@ -175,34 +202,113 @@ const ChatScreen = ({ navigation }) => {
   }
 
   const handleSend = () => {
-    if (inputText.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        text: inputText,
-        isSent: true,
-        time: new Date().toLocaleTimeString(),
-      }
-      setMessages((prevMessages) => [...prevMessages, newMessage, { id: "typing", type: "typing" }]) // Add typing indicator message
-      setInputText("")
-      setShowPredefinedMessages(false) // Hide tabs when sending
-      handleBotResponse()
+    const hasText = inputText.trim()
+    const hasImage = selectedImage
+
+    if (!hasText && !hasImage) {
+      return // Nothing to send
     }
+
+    // Create message object
+    const newMessage = {
+      id: Date.now().toString(),
+      text: inputText,
+      image: selectedImage?.uri || null,
+      imageInfo: selectedImage?.info || null,
+      isSent: true,
+      time: new Date().toLocaleTimeString(),
+    }
+
+    // Store the data before clearing
+    const userMessage = inputText
+    const imageUri = selectedImage?.uri || null
+
+    // Add message to chat
+    setMessages((prevMessages) => [...prevMessages, newMessage])
+
+    // Clear inputs
+    setInputText("")
+    setSelectedImage(null)
+    setShowPredefinedMessages(false)
+
+    // Generate AI response
+    handleBotResponse(userMessage, imageUri)
   }
 
-  const handleBotResponse = () => {
-    setTimeout(() => {
+  const handleBotResponse = async (userMessage = "", imageUri = null) => {
+    try {
+      setIsAIThinking(true)
+
+      // Add typing indicator
+      setMessages((prevMessages) => [...prevMessages, { id: "typing", type: "typing" }])
+
+      let aiResponse = ""
+
+      if (imageUri && userMessage) {
+        // Handle image with text
+        aiResponse = await generateAIResponseFromImage(imageUri, userMessage)
+      } else if (imageUri) {
+        // Handle image only
+        aiResponse = await generateAIResponseFromImage(
+          imageUri,
+          "What do you see in this image? Please provide a detailed analysis.",
+        )
+      } else if (userMessage) {
+        // Handle text only
+        aiResponse = await generateAcademicResponse(userMessage)
+      } else {
+        // Fallback
+        aiResponse = "Hello! I'm your Academic Assistant powered by AI. How can I help you with your studies today?"
+      }
+
+      // Remove typing indicator and add AI response
       setMessages((prevMessages) => {
-        const updatedMessages = prevMessages.filter((msg) => msg.id !== "typing") // Remove typing indicator
+        const updatedMessages = prevMessages.filter((msg) => msg.id !== "typing")
         const botMessage = {
           id: Date.now().toString(),
-          text: "This is a bot response!",
+          text: aiResponse,
           isSent: false,
           time: new Date().toLocaleTimeString(),
         }
         return [...updatedMessages, botMessage]
       })
-      setShowPredefinedMessages(true) // Show tabs after bot responds
-    }, 1500) // Simulate bot thinking time
+
+      setShowPredefinedMessages(true)
+    } catch (error) {
+      console.error("Error getting AI response:", error)
+
+      // Remove typing indicator and show error message
+      setMessages((prevMessages) => {
+        const updatedMessages = prevMessages.filter((msg) => msg.id !== "typing")
+        const errorMessage = {
+          id: Date.now().toString(),
+          text: "I apologize, but I'm having trouble processing your request right now. Please try again.",
+          isSent: false,
+          time: new Date().toLocaleTimeString(),
+        }
+        return [...updatedMessages, errorMessage]
+      })
+
+      setShowPredefinedMessages(true)
+    } finally {
+      setIsAIThinking(false)
+    }
+  }
+
+  const handlePredefinedMessage = (message) => {
+    setInputText(message)
+    setShowPredefinedMessages(false)
+
+    // Automatically send the predefined message
+    const newMessage = {
+      id: Date.now().toString(),
+      text: message,
+      isSent: true,
+      time: new Date().toLocaleTimeString(),
+    }
+
+    setMessages((prevMessages) => [...prevMessages, newMessage])
+    handleBotResponse(message)
   }
 
   const renderMessage = ({ item }) => {
@@ -239,11 +345,17 @@ const ChatScreen = ({ navigation }) => {
             selectedMessages.includes(item.id) && styles.selectedMessageBubble,
           ]}
         >
-          {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.sentImage} />
-          ) : (
-            <Text style={styles.messageText}>{item.text}</Text>
+          {item.image && (
+            <View>
+              <Image source={{ uri: item.image }} style={styles.sentImage} />
+              {item.imageInfo && (
+                <Text style={styles.imageInfoText}>
+                  {item.imageInfo.extension?.toUpperCase()} • {Math.round(item.imageInfo.size / 1024)}KB
+                </Text>
+              )}
+            </View>
           )}
+          {item.text ? <Text style={styles.messageText}>{item.text}</Text> : null}
           <Text style={styles.messageTime}>{item.time}</Text>
         </View>
       </TouchableOpacity>
@@ -279,13 +391,20 @@ const ChatScreen = ({ navigation }) => {
                   </View>
                   <View>
                     <Text style={styles.headerTitle}>Academic Assistant</Text>
-                    <Text style={styles.headerSubtitle}>{isOnline ? "Online" : "Offline"}</Text>
+                    <Text style={styles.headerSubtitle}>
+                      {isAIThinking ? "Thinking..." : isOnline ? "Online" : "Offline"}
+                    </Text>
                   </View>
                 </>
               ) : (
                 <Text style={styles.headerTitle}>{selectedMessages.length} selected</Text>
               )}
             </View>
+            {isSelectionMode && (
+              <TouchableOpacity onPress={deleteSelectedMessages} style={styles.deleteButton}>
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <FlatList
@@ -294,11 +413,11 @@ const ChatScreen = ({ navigation }) => {
             renderItem={renderMessage}
             style={styles.messageList}
             ListHeaderComponent={() => (
-              // Info Box
               <View style={styles.infoBox}>
                 <ShieldCheck size={16} color="#088a6a" style={styles.infoBoxIcon} />
                 <Text style={styles.infoBoxText}>
-                  Your Personal Academic assistant is here to answer all questions. Ask what's on your mind.
+                  Your Personal Academic assistant powered by AI is here to answer all questions. Ask what's on your
+                  mind or share images for analysis.
                 </Text>
               </View>
             )}
@@ -310,7 +429,7 @@ const ChatScreen = ({ navigation }) => {
             style={styles.keyboardAvoidingContainer}
           >
             <View style={styles.inputAreaWrapper}>
-              {showPredefinedMessages && (
+              {showPredefinedMessages && !selectedImage && (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -320,10 +439,7 @@ const ChatScreen = ({ navigation }) => {
                     <TouchableOpacity
                       key={index}
                       style={styles.predefinedMessageTab}
-                      onPress={() => {
-                        setInputText(msg)
-                        setShowPredefinedMessages(false)
-                      }}
+                      onPress={() => handlePredefinedMessage(msg)}
                     >
                       <Text style={styles.predefinedMessageText}>{msg}</Text>
                     </TouchableOpacity>
@@ -331,23 +447,42 @@ const ChatScreen = ({ navigation }) => {
                 </ScrollView>
               )}
 
+              {/* Show selected image preview */}
+              {selectedImage && (
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
+                  <TouchableOpacity style={styles.removeImageButton} onPress={() => setSelectedImage(null)}>
+                    <Text style={styles.removeImageText}>×</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.imagePreviewText}>
+                    {selectedImage.info?.extension?.toUpperCase()} • {Math.round(selectedImage.info?.size / 1024)}KB
+                  </Text>
+                </View>
+              )}
+
               <View style={styles.inputRow}>
                 <View style={styles.inputFieldContainer}>
-                  <TouchableOpacity onPress={pickImage}>
+                  <TouchableOpacity onPress={showImagePickerOptions}>
                     <Paperclip size={28} color="#888" />
                   </TouchableOpacity>
                   <TextInput
                     style={styles.input}
-                    placeholder="Message"
+                    placeholder={selectedImage ? "Add a message about this image..." : "Message"}
                     placeholderTextColor="#888"
                     value={inputText}
                     onChangeText={(text) => {
                       setInputText(text)
-                      setShowPredefinedMessages(text.length === 0) // Show/hide based on input text
+                      setShowPredefinedMessages(text.length === 0 && !selectedImage)
                     }}
+                    multiline
+                    maxLength={1000}
                   />
                 </View>
-                <TouchableOpacity onPress={inputText.trim() ? handleSend : null} style={styles.sendButton}>
+                <TouchableOpacity
+                  onPress={inputText.trim() || selectedImage ? handleSend : null}
+                  style={[styles.sendButton, { opacity: inputText.trim() || selectedImage ? 1 : 0.5 }]}
+                  disabled={isAIThinking}
+                >
                   <Send size={28} color="#000" />
                 </TouchableOpacity>
               </View>
@@ -413,6 +548,17 @@ const styles = StyleSheet.create({
     color: "#555",
     fontSize: 12,
   },
+  deleteButton: {
+    backgroundColor: "#ff4444",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -427,7 +573,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 2,
-    marginTop: 15
+    marginTop: 15,
   },
   infoBoxIcon: {
     marginRight: 8,
@@ -477,6 +623,7 @@ const styles = StyleSheet.create({
   messageText: {
     color: "#000",
     fontSize: 14,
+    lineHeight: 20,
   },
   messageTime: {
     color: "#b1b1b1",
@@ -492,14 +639,46 @@ const styles = StyleSheet.create({
   inputAreaWrapper: {
     flexDirection: "column",
     alignItems: "center",
-    paddingBottom: Platform.OS === "ios" ? 20 : 5, // Apply overall padding here
+    paddingBottom: Platform.OS === "ios" ? 20 : 5,
+  },
+  imagePreviewContainer: {
+    position: "relative",
+    marginHorizontal: 20,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: "#f0f0f0",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "#ff4444",
+    borderRadius: 15,
+    width: 25,
+    height: 25,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeImageText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  imagePreviewText: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
   },
   inputRow: {
-    
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    width: "100%", // Ensure it spans full width
+    width: "100%",
   },
   inputFieldContainer: {
     flex: 1,
@@ -516,6 +695,7 @@ const styles = StyleSheet.create({
     color: "#000",
     marginHorizontal: 10,
     fontSize: 14,
+    maxHeight: 100,
   },
   sendButton: {
     backgroundColor: "#fff",
@@ -527,6 +707,12 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 10,
     marginBottom: 5,
+  },
+  imageInfoText: {
+    fontSize: 10,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 2,
   },
   selectedMessage: {
     opacity: 0.8,
@@ -547,7 +733,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#088a6a",
   },
-  // New styles for TypingIndicator
   typingBubble: {
     flexDirection: "row",
     alignItems: "center",
@@ -560,16 +745,15 @@ const styles = StyleSheet.create({
     color: "#000",
     marginHorizontal: 2,
   },
-  // New styles for Pre-written Message Tabs
   predefinedMessagesContainer: {
     paddingHorizontal: 16,
     marginBottom: 13,
-    width: "100%", // Ensure it spans full width
+    width: "100%",
   },
   predefinedMessageTab: {
     backgroundColor: "#fff",
     borderRadius: 30,
-    height: 36, // Adjusted height for smaller tabs
+    height: 36,
     paddingHorizontal: 12,
     marginRight: 10,
     borderWidth: 1,

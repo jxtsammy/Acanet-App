@@ -100,31 +100,6 @@ const PrivacySettingsScreen = ({ navigation }) => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}>
 
-            {/* Profile Visibility Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Profile Visibility</Text>
-              <View style={styles.visibilityContainer}>
-                {renderRadioOption({
-                  value: 'public',
-                  label: 'Public - Anyone can view your profile',
-                  currentValue: profileVisibility,
-                  onSelect: handleVisibilityChange
-                })}
-                {renderRadioOption({
-                  value: 'contacts',
-                  label: 'Contacts Only - Only your contacts can view your profile',
-                  currentValue: profileVisibility,
-                  onSelect: handleVisibilityChange
-                })}
-                {renderRadioOption({
-                  value: 'private',
-                  label: 'Private - Only you can view your profile',
-                  currentValue: profileVisibility,
-                  onSelect: handleVisibilityChange
-                })}
-              </View>
-            </View>
-
             {/* Data & Privacy Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Data & Privacy</Text>

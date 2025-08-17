@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+"use client"
+
+import { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -11,157 +13,171 @@ import {
   SafeAreaView,
   Alert,
   Platform,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
+} from "react-native"
+import Icon from "react-native-vector-icons/MaterialIcons"
+import { LinearGradient } from "expo-linear-gradient"
+import { FIREBASE_AUTH } from "../../firebaseConfig"
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth"
 
 const ChangePasswordScreen = ({ navigation }) => {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordStrength, setPasswordStrength] = useState(0);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [passwordStrength, setPasswordStrength] = useState(0)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [requirements, setRequirements] = useState({
     length: false,
     uppercase: false,
     lowercase: false,
     number: false,
-    special: false,
-    match: false
-  });
+    match: false,
+  })
 
   // Check password strength and requirements
   useEffect(() => {
     if (newPassword) {
       // Check requirements
-      const hasLength = newPassword.length >= 8;
-      const hasUppercase = /[A-Z]/.test(newPassword);
-      const hasLowercase = /[a-z]/.test(newPassword);
-      const hasNumber = /[0-9]/.test(newPassword);
-      const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-      const doPasswordsMatch = newPassword === confirmPassword && newPassword !== '';
-      
+      const hasLength = newPassword.length >= 8
+      const hasUppercase = /[A-Z]/.test(newPassword)
+      const hasLowercase = /[a-z]/.test(newPassword)
+      const hasNumber = /[0-9]/.test(newPassword)
+      const doPasswordsMatch = newPassword === confirmPassword && newPassword !== ""
+
       setRequirements({
         length: hasLength,
         uppercase: hasUppercase,
         lowercase: hasLowercase,
         number: hasNumber,
-        special: hasSpecial,
-        match: doPasswordsMatch
-      });
-      
-      // Calculate strength (0-4)
-      let strength = 0;
-      if (hasLength) strength++;
-      if (hasUppercase && hasLowercase) strength++;
-      if (hasNumber) strength++;
-      if (hasSpecial) strength++;
-      
-      setPasswordStrength(strength);
+        match: doPasswordsMatch,
+      })
+
+      // Calculate strength (0-3)
+      let strength = 0
+      if (hasLength) strength++
+      if (hasUppercase && hasLowercase) strength++
+      if (hasNumber) strength++
+
+      setPasswordStrength(strength)
     } else {
-      setPasswordStrength(0);
+      setPasswordStrength(0)
       setRequirements({
         length: false,
         uppercase: false,
         lowercase: false,
         number: false,
-        special: false,
-        match: false
-      });
+        match: false,
+      })
     }
-  }, [newPassword, confirmPassword]);
+  }, [newPassword, confirmPassword])
 
-  // Function to change password
-  const changePassword = () => {
-    // Validate current password (in a real app, this would be checked against the server)
+  const changePassword = async () => {
+    // Validate current password
     if (!currentPassword) {
-      Alert.alert("Error", "Please enter your current password.");
-      return;
+      Alert.alert("Error", "Please enter your current password.")
+      return
     }
-    
+
     // Check if new password meets requirements
-    if (passwordStrength < 3) {
-      Alert.alert("Weak Password", "Please create a stronger password that meets all requirements.");
-      return;
+    if (passwordStrength < 2) {
+      Alert.alert("Weak Password", "Please create a stronger password that meets all requirements.")
+      return
     }
-    
+
     // Check if passwords match
     if (newPassword !== confirmPassword) {
-      Alert.alert("Passwords Don't Match", "Your new password and confirmation do not match.");
-      return;
+      Alert.alert("Passwords Don't Match", "Your new password and confirmation do not match.")
+      return
     }
-    
-    // Here you would typically call an API to change the password
-    Alert.alert(
-      "Password Changed",
-      "Your password has been updated successfully.",
-      [{ text: "OK", onPress: () => navigation.goBack() }]
-    );
-  };
+
+    setIsLoading(true)
+
+    try {
+      const user = FIREBASE_AUTH.currentUser
+
+      if (!user || !user.email) {
+        Alert.alert("Error", "No user is currently logged in.")
+        setIsLoading(false)
+        return
+      }
+
+      // Create credential for reauthentication
+      const credential = EmailAuthProvider.credential(user.email, currentPassword)
+
+      // Reauthenticate user with current password
+      await reauthenticateWithCredential(user, credential)
+
+      // If reauthentication successful, update password
+      await updatePassword(user, newPassword)
+
+      Alert.alert("Password Changed", "Your password has been updated successfully.", [
+        { text: "OK", onPress: () => navigation.goBack() },
+      ])
+    } catch (error) {
+      console.error("Password change error:", error)
+
+      let errorMessage = "An error occurred while changing your password."
+
+      if (error.code === "auth/wrong-password") {
+        errorMessage = "Your current password is incorrect."
+      } else if (error.code === "auth/weak-password") {
+        errorMessage = "The new password is too weak."
+      } else if (error.code === "auth/requires-recent-login") {
+        errorMessage = "Please log out and log back in before changing your password."
+      }
+
+      Alert.alert("Error", errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Get strength label and color
   const getStrengthLabel = () => {
     switch (passwordStrength) {
-      case 0: return { label: "Very Weak", color: "#FF3B30" };
-      case 1: return { label: "Weak", color: "#FF9500" };
-      case 2: return { label: "Medium", color: "#FFCC00" };
-      case 3: return { label: "Strong", color: "#34C759" };
-      case 4: return { label: "Very Strong", color: "#00FF00" };
-      default: return { label: "Very Weak", color: "#FF3B30" };
+      case 0:
+        return { label: "Very Weak", color: "#FF3B30" }
+      case 1:
+        return { label: "Weak", color: "#FF9500" }
+      case 2:
+        return { label: "Medium", color: "#FFCC00" }
+      case 3:
+        return { label: "Strong", color: "#34C759" }
+      default:
+        return { label: "Very Weak", color: "#FF3B30" }
     }
-  };
+  }
 
   // Render a requirement item
   const renderRequirement = (text, met) => (
     <View style={styles.requirementItem}>
-      <Icon 
-        name={met ? "check-circle" : "cancel"} 
-        size={16} 
-        color={met ? "#34C759" : "#FF3B30"} 
-      />
-      <Text style={[styles.requirementText, { color: met ? "#34C759" : "#FF3B30" }]}>
-        {text}
-      </Text>
+      <Icon name={met ? "check-circle" : "cancel"} size={16} color={met ? "#34C759" : "#FF3B30"} />
+      <Text style={[styles.requirementText, { color: met ? "#34C759" : "#FF3B30" }]}>{text}</Text>
     </View>
-  );
+  )
 
   return (
-    <ImageBackground
-      source={require('../../assets/globe.jpg')}
-      style={styles.backgroundImage}>
-      <LinearGradient
-        colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)", "rgba(0,0,0,0.9)"]}
-        style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="transparent"
-          translucent
-        />
+    <ImageBackground source={require("../../assets/globe.jpg")} style={styles.backgroundImage}>
+      <LinearGradient colors={["rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)", "rgba(0,0,0,0.9)"]} style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <Icon name="arrow-back" size={30} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.headerText}>Change Password</Text>
           </View>
 
-          <ScrollView 
-            showsVerticalScrollIndicator={false} 
-            contentContainerStyle={styles.scrollContent}>
-            
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Security Icon */}
             <View style={styles.securityIconContainer}>
               <Icon name="security" size={60} color="#fff" />
-              <Text style={styles.securityText}>
-                Create a strong password to protect your account
-              </Text>
+              <Text style={styles.securityText}>Create a strong password to protect your account</Text>
             </View>
-            
+
             {/* Password Form */}
             <View style={styles.formContainer}>
               {/* Current Password */}
@@ -176,17 +192,18 @@ const ChangePasswordScreen = ({ navigation }) => {
                     value={currentPassword}
                     onChangeText={setCurrentPassword}
                     secureTextEntry={!showCurrentPassword}
+                    editable={!isLoading}
                   />
                   <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)}>
-                    <Icon 
-                      name={showCurrentPassword ? "visibility-off" : "visibility"} 
-                      size={20} 
-                      color="rgba(255,255,255,0.7)" 
+                    <Icon
+                      name={showCurrentPassword ? "visibility-off" : "visibility"}
+                      size={20}
+                      color="rgba(255,255,255,0.7)"
                     />
                   </TouchableOpacity>
                 </View>
               </View>
-              
+
               {/* New Password */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.inputLabel}>New Password</Text>
@@ -199,16 +216,17 @@ const ChangePasswordScreen = ({ navigation }) => {
                     value={newPassword}
                     onChangeText={setNewPassword}
                     secureTextEntry={!showNewPassword}
+                    editable={!isLoading}
                   />
                   <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
-                    <Icon 
-                      name={showNewPassword ? "visibility-off" : "visibility"} 
-                      size={20} 
-                      color="rgba(255,255,255,0.7)" 
+                    <Icon
+                      name={showNewPassword ? "visibility-off" : "visibility"}
+                      size={20}
+                      color="rgba(255,255,255,0.7)"
                     />
                   </TouchableOpacity>
                 </View>
-                
+
                 {/* Password Strength Indicator */}
                 {newPassword.length > 0 && (
                   <View style={styles.strengthContainer}>
@@ -216,20 +234,20 @@ const ChangePasswordScreen = ({ navigation }) => {
                       Strength: <Text style={{ color: getStrengthLabel().color }}>{getStrengthLabel().label}</Text>
                     </Text>
                     <View style={styles.strengthBar}>
-                      <View 
+                      <View
                         style={[
-                          styles.strengthFill, 
-                          { 
-                            width: `${(passwordStrength / 4) * 100}%`,
-                            backgroundColor: getStrengthLabel().color 
-                          }
-                        ]} 
+                          styles.strengthFill,
+                          {
+                            width: `${(passwordStrength / 3) * 100}%`,
+                            backgroundColor: getStrengthLabel().color,
+                          },
+                        ]}
                       />
                     </View>
                   </View>
                 )}
               </View>
-              
+
               {/* Confirm Password */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.inputLabel}>Confirm Password</Text>
@@ -242,17 +260,18 @@ const ChangePasswordScreen = ({ navigation }) => {
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     secureTextEntry={!showConfirmPassword}
+                    editable={!isLoading}
                   />
                   <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    <Icon 
-                      name={showConfirmPassword ? "visibility-off" : "visibility"} 
-                      size={20} 
-                      color="rgba(255,255,255,0.7)" 
+                    <Icon
+                      name={showConfirmPassword ? "visibility-off" : "visibility"}
+                      size={20}
+                      color="rgba(255,255,255,0.7)"
                     />
                   </TouchableOpacity>
                 </View>
               </View>
-              
+
               {/* Password Requirements */}
               <View style={styles.requirementsContainer}>
                 <Text style={styles.requirementsTitle}>Password Requirements:</Text>
@@ -261,7 +280,6 @@ const ChangePasswordScreen = ({ navigation }) => {
                   {renderRequirement("At least one uppercase letter", requirements.uppercase)}
                   {renderRequirement("At least one lowercase letter", requirements.lowercase)}
                   {renderRequirement("At least one number", requirements.number)}
-                  {renderRequirement("At least one special character", requirements.special)}
                   {renderRequirement("Passwords match", requirements.match)}
                 </View>
               </View>
@@ -269,22 +287,23 @@ const ChangePasswordScreen = ({ navigation }) => {
 
             {/* Save Button */}
             <View style={styles.buttonContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.saveButton,
-                  { opacity: passwordStrength >= 3 && requirements.match ? 1 : 0.7 }
-                ]} 
+                  { opacity: passwordStrength >= 2 && requirements.match && !isLoading ? 1 : 0.7 },
+                ]}
                 onPress={changePassword}
-                disabled={passwordStrength < 3 || !requirements.match}
+                disabled={passwordStrength < 2 || !requirements.match || isLoading}
               >
-                <Text style={styles.saveButtonText}>Update Password</Text>
+                <Text style={styles.saveButtonText}>{isLoading ? "Updating Password..." : "Update Password"}</Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Forgot Password Link */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.forgotPasswordLink}
               onPress={() => Alert.alert("Forgot Password", "A password reset link will be sent to your email.")}
+              disabled={isLoading}
             >
               <Text style={styles.forgotPasswordText}>Forgot your current password?</Text>
             </TouchableOpacity>
@@ -292,8 +311,8 @@ const ChangePasswordScreen = ({ navigation }) => {
         </SafeAreaView>
       </LinearGradient>
     </ImageBackground>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   backgroundImage: {
@@ -315,7 +334,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    paddingTop: Platform.OS === 'ios' ? 20 : 40,
+    paddingTop: Platform.OS === "ios" ? 20 : 40,
   },
   backButton: {
     marginRight: 15,
@@ -439,6 +458,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textDecorationLine: "underline",
   },
-});
+})
 
-export default ChangePasswordScreen;
+export default ChangePasswordScreen

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -16,6 +16,19 @@ import {
   Platform,
 } from "react-native"
 import Ionicons from "react-native-vector-icons/MaterialIcons"
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  updateDoc,
+} from "firebase/firestore"
+import { FIRESTORE_DB } from "../../firebaseConfig"
+import { getAuth, onAuthStateChanged } from "firebase/auth"
 
 const App = ({ navigation }) => {
   const [searchText, setSearchText] = useState("")
@@ -30,117 +43,147 @@ const App = ({ navigation }) => {
   const [toastHeading, setToastHeading] = useState("")
   const toastProgress = useState(new Animated.Value(0))[0]
 
-  const [contacts, setContacts] = useState([
-    {
-      id: "1",
-      name: "John Doe",
-      occupation: "Student",
-      avatar: "https://i.pravatar.cc/150?u=1",
-      bio: "Passionate about learning new technologies and building innovative solutions. Currently exploring AI and machine learning.",
-      location: "New York, USA",
-      connectionStatus: "connected",
-      isOnline: true,
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      occupation: "Lecturer",
-      avatar: "https://i.pravatar.cc/150?u=2",
-      bio: "Experienced educator with a focus on computer science and data structures. Dedicated to fostering student growth.",
-      location: "London, UK",
-      connectionStatus: "not_connected",
-      isOnline: false,
-    },
-    {
-      id: "3",
-      name: "Michael Johnson",
-      occupation: "Student",
-      avatar: "https://i.pravatar.cc/150?u=3",
-      bio: "Aspiring software engineer with a keen interest in mobile app development. Always eager to collaborate on projects.",
-      location: "San Francisco, USA",
-      connectionStatus: "not_connected",
-      isOnline: true,
-    },
-    {
-      id: "4",
-      name: "Emily Brown",
-      occupation: "Lecturer",
-      avatar: "https://i.pravatar.cc/150?u=4",
-      bio: "Researcher in artificial intelligence and natural language processing. Committed to advancing the field through teaching and research.",
-      location: "Berlin, Germany",
-      connectionStatus: "connected",
-      isOnline: false,
-    },
-    {
-      id: "5",
-      name: "David Williams",
-      occupation: "Student",
-      avatar: "https://i.pravatar.cc/150?u=5",
-      bio: "Creative designer with a passion for user experience. Specializing in UI/UX for web and mobile applications.",
-      location: "Sydney, Australia",
-      connectionStatus: "not_connected",
-      isOnline: true,
-    },
-    {
-      id: "6",
-      name: "Sophia Miller",
-      occupation: "Lecturer",
-      avatar: "https://i.pravatar.cc/150?u=6",
-      bio: "Professor of economics with expertise in financial markets and behavioral economics. Author of several acclaimed books.",
-      location: "Paris, France",
-      connectionStatus: "not_connected",
-      isOnline: false,
-    },
-    {
-      id: "7",
-      name: "Chris Evans",
-      occupation: "Student",
-      avatar: "https://i.pravatar.cc/150?u=7",
-      bio: "Enthusiastic entrepreneur building a startup in the sustainable energy sector. Believes in technology for good.",
-      location: "Austin, USA",
-      connectionStatus: "connected",
-      isOnline: true,
-    },
-    {
-      id: "8",
-      name: "Megan Fox",
-      occupation: "Lecturer",
-      avatar: "https://i.pravatar.cc/150?u=8",
-      bio: "Award-winning journalist and media studies lecturer. Focuses on digital media ethics and investigative reporting.",
-      location: "Tokyo, Japan",
-      connectionStatus: "not_connected",
-      isOnline: false,
-    },
-    {
-      id: "9",
-      name: "Mark Ruffalo",
-      occupation: "Student",
-      avatar: "https://i.pravatar.cc/150?u=9",
-      bio: "Environmental activist and aspiring filmmaker. Uses storytelling to raise awareness about climate change.",
-      location: "Vancouver, Canada",
-      connectionStatus: "not_connected",
-      isOnline: true,
-    },
-    {
-      id: "10",
-      name: "Scarlett Johansson",
-      occupation: "Lecturer",
-      avatar: "https://i.pravatar.cc/150?u=10",
-      bio: "Renowned astrophysicist and lecturer, specializing in black holes and cosmology. Inspiring the next generation of scientists.",
-      location: "Cambridge, USA",
-      connectionStatus: "connected",
-      isOnline: false,
-    },
-  ])
+  const [allUsers, setAllUsers] = useState([])
+  const [userNetworks, setUserNetworks] = useState([])
+  const [sentRequests, setSentRequests] = useState([])
 
-  const filterContacts = (text) => {
-    const filtered = contacts.filter(
-      (contact) =>
-        contact.name.toLowerCase().includes(text.toLowerCase()) ||
-        contact.occupation.toLowerCase().includes(text.toLowerCase()) ||
-        (contact.bio && contact.bio.toLowerCase().includes(text.toLowerCase())) ||
-        (contact.location && contact.location.toLowerCase().includes(text.toLowerCase())),
+  // State for the currently logged-in user's details
+  const [currentUser, setCurrentUser] = useState(null)
+  const [currentUserDetails, setCurrentUserDetails] = useState(null)
+
+  // --- Firebase Authentication Listener ---
+  useEffect(() => {
+    const auth = getAuth()
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user)
+    })
+    return () => unsubscribeAuth()
+  }, [])
+
+  // Fetch current user's details from Firestore once auth state is known
+  useEffect(() => {
+    if (currentUser) {
+      const userDocRef = doc(FIRESTORE_DB, "users", currentUser.uid)
+      const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setCurrentUserDetails({ id: docSnap.id, ...docSnap.data() })
+        } else {
+          // Handle case where user document doesn't exist (e.g., first login)
+          console.log("No user document found for this UID.")
+        }
+      })
+      return () => unsubscribeUser()
+    } else {
+      setCurrentUserDetails(null)
+    }
+  }, [currentUser])
+
+  // --- Firestore Real-Time Listeners ---
+  useEffect(() => {
+    if (!currentUserDetails) return; // Wait for current user details to be loaded
+
+    // Listener for all users in the 'users' collection
+    const usersCollection = collection(FIRESTORE_DB, "users")
+    const usersListener = onSnapshot(usersCollection, (snapshot) => {
+      const usersArray = snapshot.docs
+        .filter((doc) => doc.id !== currentUserDetails.id)
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+      setAllUsers(usersArray)
+    })
+
+    // Listener for the current user's network connections
+    const networksCollection = collection(FIRESTORE_DB, "networks")
+    const networksQuery = query(networksCollection, where("userId", "==", currentUserDetails.id))
+    const networksListener = onSnapshot(networksQuery, (snapshot) => {
+      const networksArray = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      setUserNetworks(networksArray)
+    })
+
+    // Listener for network requests sent by the current user
+    const sentRequestsCollection = collection(FIRESTORE_DB, "networkRequests")
+    const sentRequestsQuery = query(sentRequestsCollection, where("fromUserId", "==", currentUserDetails.id))
+    const sentRequestsListener = onSnapshot(sentRequestsQuery, (snapshot) => {
+      const sentRequestsArray = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      setSentRequests(sentRequestsArray)
+    })
+
+    // Cleanup listeners on unmount
+    return () => {
+      usersListener()
+      networksListener()
+      sentRequestsListener()
+    }
+  }, [currentUserDetails])
+
+  // Function to determine connection status based on Firestore data
+  const getConnectionStatus = (contactId) => {
+    // Check if the user is in our network
+    if (userNetworks.find((network) => network.networkMemberId === contactId)) {
+      return "connected"
+    }
+
+    // Check if a request has been sent to this user and is pending
+    if (sentRequests.find((request) => request.toUserId === contactId && request.status === "pending")) {
+      return "pending"
+    }
+
+    return "not_connected"
+  }
+
+  // --- Firestore Functions to Interact with DB ---
+  const sendNetworkRequest = async (recipientUserId, senderDetails) => {
+    const networkRequestsCollection = collection(FIRESTORE_DB, "networkRequests")
+    const requestData = {
+      fromUserId: senderDetails.id,
+      toUserId: recipientUserId,
+      status: "pending",
+      timestamp: Date.now(),
+      fromUserFirstName: senderDetails.firstName,
+      fromUserLastName: senderDetails.lastName,
+      fromUserInstitution: senderDetails.institution,
+      fromUserRole: senderDetails.userRole,
+      fromUserProfileImage: senderDetails.profileImageUrl,
+    }
+    await addDoc(networkRequestsCollection, requestData)
+  }
+
+  const disconnectUser = async (contactId) => {
+    const networkQuery1 = query(
+      collection(FIRESTORE_DB, "networks"),
+      where("userId", "==", currentUserDetails.id),
+      where("networkMemberId", "==", contactId),
     )
+    const networkQuery2 = query(
+      collection(FIRESTORE_DB, "networks"),
+      where("userId", "==", contactId),
+      where("networkMemberId", "==", currentUserDetails.id),
+    )
+
+    const [snapshot1, snapshot2] = await Promise.all([getDocs(networkQuery1), getDocs(networkQuery2)])
+    const promises = []
+
+    snapshot1.forEach((doc) => promises.push(deleteDoc(doc.ref)))
+    snapshot2.forEach((doc) => promises.push(deleteDoc(doc.ref)))
+
+    await Promise.all(promises)
+  }
+
+  // --- Search and UI Logic ---
+  const filterContacts = (text) => {
+    if (!text) {
+      setFilteredContacts([])
+      return
+    }
+    const filtered = allUsers.filter((user) => {
+      const fullName = `${user.firstName || ""} ${user.lastName || ""}`.toLowerCase()
+      const searchTerm = text.toLowerCase()
+      return (
+        fullName.includes(searchTerm) ||
+        (user.userRole && user.userRole.toLowerCase().includes(searchTerm)) ||
+        (user.bio && user.bio.toLowerCase().includes(searchTerm)) ||
+        (user.location && user.location.toLowerCase().includes(searchTerm))
+      )
+    })
     setFilteredContacts(filtered)
   }
 
@@ -191,34 +234,48 @@ const App = ({ navigation }) => {
     }, 3000)
   }
 
-  const handleConnect = (contactId) => {
-    setContacts((prevContacts) =>
-      prevContacts.map((c) => (c.id === contactId ? { ...c, connectionStatus: "pending" } : c)),
-    )
-    setModalVisible(false) // Close modal on connect press
-    showToast("Network Request Sent", `Your request has been sent to ${selectedContact.name}`, "person-add")
-
-    // Simulate request acceptance after a delay
-    setTimeout(() => {
-      setContacts((prevContacts) =>
-        prevContacts.map((c) => (c.id === contactId ? { ...c, connectionStatus: "connected" } : c)),
-      )
-      // Optionally show a "Request Accepted" toast here if needed
-    }, 3000)
+  const handleConnect = async (contact) => {
+    try {
+      if (currentUserDetails) {
+        await sendNetworkRequest(contact.id, currentUserDetails)
+        setModalVisible(false)
+        showToast(
+          "Network Request Sent",
+          `Your request has been sent to ${contact.firstName || "the user"}`,
+          "person-add",
+        )
+      } else {
+        showToast("Error", "User details not loaded. Please try again.", "error-outline")
+      }
+    } catch (error) {
+      console.error("Error sending request:", error)
+      showToast("Error", "Failed to send network request.", "error-outline")
+    }
   }
 
-  const handleDisconnect = (contactId) => {
-    setContacts((prevContacts) =>
-      prevContacts.map((c) => (c.id === contactId ? { ...c, connectionStatus: "not_connected" } : c)),
-    )
-    setModalVisible(false) // Close modal on disconnect press
-    showToast("Network Update", `User ${selectedContact.name} has been removed from your network.`, "person-remove")
+  const handleDisconnect = async (contactId) => {
+    try {
+      await disconnectUser(contactId)
+      setModalVisible(false)
+      const disconnectedUser = allUsers.find((user) => user.id === contactId)
+      showToast(
+        "Network Update",
+        `User ${disconnectedUser?.firstName || "has been removed"} from your network.`,
+        "person-remove",
+      )
+    } catch (error) {
+      console.error("Error disconnecting:", error)
+      showToast("Error", "Failed to disconnect user.", "error-outline")
+    }
   }
 
   const handleMessage = (contact) => {
     setModalVisible(false)
     if (navigation && navigation.navigate) {
-      navigation.navigate("ChatInterface", { contact: contact })
+      navigation.navigate("ChatInterface", {
+        firstName: contact.firstName,
+        lastName: contact.lastName
+      })
     } else {
       console.warn("Navigation prop not available. Cannot navigate to ChatInterface.")
     }
@@ -236,27 +293,46 @@ const App = ({ navigation }) => {
     </TouchableOpacity>
   )
 
-  const renderContact = ({ item }) => (
-    <TouchableOpacity style={styles.contact} onPress={() => openContactDetailsModal(item)}>
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        {item.isOnline && <View style={styles.onlineIndicatorList} />}
-      </View>
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName}>{item.name}</Text>
-        <Text style={styles.contactOccupation}>{item.occupation}</Text>
-        {item.location && <Text style={styles.contactLocation}>{item.location}</Text>}
-      </View>
-      {/* This TouchableOpacity also opens the modal */}
-      <TouchableOpacity style={styles.connectionIconContainer} onPress={() => openContactDetailsModal(item)}>
-        {item.connectionStatus === "connected" ? (
-          <Ionicons name="check" size={30} color="#fff" />
-        ) : (
-          <Ionicons name="add" size={30} color="#fff" />
-        )}
+  const renderContact = ({ item }) => {
+    const connectionStatus = getConnectionStatus(item.id)
+    const displayName = `${item.firstName || ""} ${item.lastName || ""}`.trim()
+    const displayOccupation = item.userRole
+    const displayAvatar = item.profileImageUrl
+
+    // Conditional email display logic with fallback
+    const displayEmail = item.userRole === "lecturer" ? (item.workEmail || item.email) : item.email;
+
+    const displayLocation = item.location
+    const isOnline = item.isOnline
+
+    return (
+      <TouchableOpacity style={styles.contact} onPress={() => openContactDetailsModal(item)}>
+        <View style={styles.avatarContainer}>
+          {displayAvatar ? (
+            <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.defaultAvatar]}>
+              <Ionicons name="person" size={40} color="#000" />
+            </View>
+          )}
+          {isOnline && <View style={styles.onlineIndicatorList} />}
+        </View>
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactName}>{displayName || "Name not available"}</Text>
+          <Text style={styles.contactOccupation}>{displayOccupation}</Text>
+          {displayEmail && <Text style={styles.contactEmail}>{displayEmail}</Text>}
+          {displayLocation && <Text style={styles.contactLocation}>{displayLocation}</Text>}
+        </View>
+        <TouchableOpacity style={styles.connectionIconContainer} onPress={() => openContactDetailsModal(item)}>
+          {connectionStatus === "connected" ? (
+            <Ionicons name="check" size={30} color="#fff" />
+          ) : (
+            <Ionicons name="add" size={30} color="#fff" />
+          )}
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  )
+    )
+  }
 
   const progressBarWidth = toastProgress.interpolate({
     inputRange: [0, 1],
@@ -285,14 +361,20 @@ const App = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.profilePictureContainer}>
-          <Image source={{ uri: "https://i.pravatar.cc/150?u=profile" }} style={styles.profilePicture} />
+          {currentUserDetails?.profileImageUrl ? (
+            <Image source={{ uri: currentUserDetails.profileImageUrl }} style={styles.profilePicture} />
+          ) : (
+            <View style={[styles.profilePicture, styles.defaultProfilePicture]}>
+              <Ionicons name="person" size={20} color="#000" />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
       <Text style={styles.suggestionsHeading}>
         {searchText ? "Related Network" : isSearchActive ? "Recent Searches" : "Suggestions"}
       </Text>
       <FlatList
-        data={searchText ? filteredContacts : isSearchActive ? recentSearches : contacts}
+        data={searchText ? filteredContacts : isSearchActive ? recentSearches : allUsers}
         keyExtractor={(item) => item.id || item}
         renderItem={searchText ? renderContact : isSearchActive ? renderRecentSearch : renderContact}
         ListEmptyComponent={
@@ -309,12 +391,7 @@ const App = ({ navigation }) => {
       />
 
       {/* Contact Details Modal (Bottom Sheet) */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
           <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setModalVisible(false)}>
@@ -324,17 +401,32 @@ const App = ({ navigation }) => {
               <>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalAvatarContainer}>
-                    <Image source={{ uri: selectedContact.avatar }} style={styles.modalAvatar} />
+                    {selectedContact.profileImageUrl ? (
+                      <Image source={{ uri: selectedContact.profileImageUrl }} style={styles.modalAvatar} />
+                    ) : (
+                      <View style={[styles.modalAvatar, styles.defaultAvatarModal]}>
+                        <Ionicons name="person" size={60} color="#000" />
+                      </View>
+                    )}
                     {selectedContact.isOnline && <View style={styles.onlineIndicatorModal} />}
                   </View>
                   <View style={styles.modalHeaderText}>
-                    <Text style={styles.modalName}>{selectedContact.name}</Text>
-                    <Text style={styles.modalOccupation}>{selectedContact.occupation}</Text>
+                    <Text style={styles.modalName}>{`${selectedContact.firstName || ""} ${selectedContact.lastName || ""}`.trim() || "Name not available"}</Text>
+                    <Text style={styles.modalOccupation}>{selectedContact.userRole}</Text>
+                    {selectedContact.userRole === "lecturer" ? (
+                      selectedContact.workEmail ? (
+                        <Text style={styles.modalEmail}>{selectedContact.workEmail}</Text>
+                      ) : selectedContact.email ? (
+                        <Text style={styles.modalEmail}>{selectedContact.email}</Text>
+                      ) : null
+                    ) : selectedContact.email ? (
+                      <Text style={styles.modalEmail}>{selectedContact.email}</Text>
+                    ) : null}
                     {selectedContact.location && <Text style={styles.modalLocation}>@{selectedContact.location}</Text>}
                   </View>
                 </View>
                 <View style={styles.modalButtonsContainer}>
-                  {selectedContact.connectionStatus === "connected" ? (
+                  {getConnectionStatus(selectedContact.id) === "connected" ? (
                     <TouchableOpacity
                       style={styles.disconnectButton}
                       onPress={() => handleDisconnect(selectedContact.id)}
@@ -342,13 +434,13 @@ const App = ({ navigation }) => {
                       <Ionicons name="person-remove" size={20} color="#000" />
                       <Text style={styles.disconnectButtonText}>Disconnect</Text>
                     </TouchableOpacity>
-                  ) : selectedContact.connectionStatus === "pending" ? (
+                  ) : getConnectionStatus(selectedContact.id) === "pending" ? (
                     <TouchableOpacity style={styles.pendingButton} disabled>
                       <Ionicons name="hourglass-empty" size={20} color="#000" />
                       <Text style={styles.pendingButtonText}>Pending</Text>
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity style={styles.connectButton} onPress={() => handleConnect(selectedContact.id)}>
+                    <TouchableOpacity style={styles.connectButton} onPress={() => handleConnect(selectedContact)}>
                       <Ionicons name="person-add" size={20} color="#fff" />
                       <Text style={styles.connectButtonText}>Connect</Text>
                     </TouchableOpacity>
@@ -437,6 +529,11 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 30,
   },
+  defaultProfilePicture: {
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   suggestionsHeading: {
     fontSize: 20,
     fontWeight: "bold",
@@ -458,7 +555,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
-    padding: 10
+    padding: 10,
   },
   avatarContainer: {
     position: "relative",
@@ -470,6 +567,11 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 25,
+  },
+  defaultAvatar: {
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
   },
   onlineIndicatorList: {
     position: "absolute",
@@ -494,6 +596,11 @@ const styles = StyleSheet.create({
   contactOccupation: {
     fontSize: 14,
     color: "#777",
+  },
+  contactEmail: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 2,
   },
   contactLocation: {
     fontSize: 12,
@@ -526,7 +633,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   modalContent: {
-    backgroundColor: "#fff", // White background for modal content
+    backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -539,7 +646,7 @@ const styles = StyleSheet.create({
     top: 15,
     right: 15,
     zIndex: 1,
-    backgroundColor: "#E0E0E0", // Light grey for close button background
+    backgroundColor: "#E0E0E0",
     borderRadius: 15,
     padding: 5,
   },
@@ -559,10 +666,15 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 40,
   },
+  defaultAvatarModal: {
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   onlineIndicatorModal: {
     position: "absolute",
     bottom: 0,
-    right: 5, // Changed to bottom-right
+    right: 5,
     width: 16,
     height: 16,
     borderRadius: 8,
@@ -576,16 +688,21 @@ const styles = StyleSheet.create({
   modalName: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#000", // Dark text
+    color: "#000",
   },
   modalOccupation: {
     fontSize: 16,
-    color: "#111", // Darker grey for clarity
+    color: "#111",
+    marginTop: 2,
+  },
+  modalEmail: {
+    fontSize: 14,
+    color: "#333",
     marginTop: 2,
   },
   modalLocation: {
     fontSize: 14,
-    color: "#111", // Darker grey
+    color: "#111",
     marginTop: 2,
   },
   modalButtonsContainer: {
@@ -596,8 +713,8 @@ const styles = StyleSheet.create({
   connectButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#111", // Dark background for connect button
-   paddingVertical: 10,
+    backgroundColor: "#111",
+    paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 60,
     justifyContent: "center",
@@ -611,7 +728,7 @@ const styles = StyleSheet.create({
   disconnectButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ccc", // Grey for disconnect, matching image
+    backgroundColor: "#ccc",
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 60,
@@ -626,7 +743,7 @@ const styles = StyleSheet.create({
   pendingButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ccc", // Same as disconnect button
+    backgroundColor: "#ccc",
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 60,
@@ -655,31 +772,31 @@ const styles = StyleSheet.create({
   modalBioHeading: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#000", // Dark text
+    color: "#000",
     marginBottom: 10,
   },
   modalBioText: {
     fontSize: 14,
-    color: "#333", // Dark text
+    color: "#333",
     lineHeight: 20,
   },
   // Toast Styles (New Design)
   toastContainer: {
-     position: 'absolute',
+    position: "absolute",
     top: Platform.OS === "android" ? StatusBar.currentHeight + 10 : 60,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginHorizontal: 20,
     borderRadius: 10,
     padding: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
     zIndex: 1000,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   toastContent: {
     flexDirection: "row",
@@ -691,7 +808,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#000", // Black background for icon circle
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -713,7 +830,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#000", // Black background for check circle
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 10,

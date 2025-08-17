@@ -36,10 +36,8 @@ import {
 // NOTE: These are placeholders. You must ensure your actual firebaseConfig.js file
 // exports these constants correctly.
 import {
-  FIREBASE_APP,
   FIREBASE_AUTH,
   FIRESTORE_DB,
-  FIREBASE_STORAGE,
 } from '../../../firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -133,7 +131,8 @@ const LectuerProfileScreen = ({ navigation }) => {
       const profileImageUrl = profileImage;
 
       // 2. Store additional user data in Firestore
-      await setDoc(doc(FIRESTORE_DB, 'lecturers', user.uid), {
+      // --- CHANGE: Updated collection to 'users' and added 'userRole' field ---
+      await setDoc(doc(FIRESTORE_DB, 'users', user.uid), {
         firstName,
         lastName,
         workEmail,
@@ -143,8 +142,10 @@ const LectuerProfileScreen = ({ navigation }) => {
         phoneNumber,
         profileImageUrl, // Store the local URI or null
         termsAgreed,
+        userRole: 'lecturer', // New field added
         createdAt: new Date(),
       });
+      // ------------------------------------------------------------------------
 
       // 3. On successful registration, show success alert and navigate
       Alert.alert(

@@ -30,13 +30,13 @@ const SettingsScreen = ({ navigation, route }) => {
   const [user, setUser] = useState({
     name: "",
     email: "",
-    profilePicture: null, // Set default to null instead of placeholder image
+    profilePicture: null,
     firstName: "",
     lastName: "",
     institution: "",
     institutionId: "",
     bio: "",
-    userType: null, // Store user type for future reference
+    userType: null, // This will be set from the 'userRole' field
     workEmail: "",
     workId: "",
   })
@@ -48,61 +48,39 @@ const SettingsScreen = ({ navigation, route }) => {
     const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, async (firebaseUser) => {
       if (firebaseUser) {
         setCurrentUser(firebaseUser)
-        console.log("Current user UID:", firebaseUser.uid)
 
         try {
-          let userData = null
-          let userType = null
+          const userRef = doc(FIRESTORE_DB, "users", firebaseUser.uid)
+          const userDoc = await getDoc(userRef)
 
-          // First check lecturers collection
-          console.log("Checking lecturers collection for UID:", firebaseUser.uid)
-          const lecturerDoc = await getDoc(doc(FIRESTORE_DB, "lecturers", firebaseUser.uid))
-          if (lecturerDoc.exists()) {
-            userData = lecturerDoc.data()
-            userType = "lecturer"
-            console.log("Found user in lecturers collection:", userData)
-          } else {
-            console.log("User not found in lecturers collection")
-            // If not found in lecturer, check student collection
-            console.log("Checking students collection for UID:", firebaseUser.uid)
-            const studentDoc = await getDoc(doc(FIRESTORE_DB, "students", firebaseUser.uid))
-            if (studentDoc.exists()) {
-              userData = studentDoc.data()
-              userType = "student"
-              console.log("Found user in students collection:", userData)
-            } else {
-              console.log("User not found in students collection either")
-            }
-          }
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            console.log("Found user document in 'users' collection:", userData)
 
-          if (userData) {
-            console.log("Processing user data - firstName:", userData.firstName, "lastName:", userData.lastName)
             const fullName =
               userData.firstName && userData.lastName
                 ? `${userData.firstName} ${userData.lastName}`.trim()
                 : userData.firstName || userData.lastName || ""
 
-            console.log("Final processed name:", fullName)
-
             setUser({
               name: userData.displayName || fullName || firebaseUser.displayName || "User",
               email: firebaseUser.email || "",
-              profilePicture: userData.profileImageUrl || firebaseUser.photoURL || null, // Use null as fallback instead of placeholder image
+              profilePicture: userData.profileImageUrl || firebaseUser.photoURL || null,
               firstName: userData.firstName || "",
               lastName: userData.lastName || "",
               institution: userData.institution || "",
               institutionId: userData.studentId || userData.workId || "",
               bio: userData.bio || "",
-              userType: userType,
+              userType: userData.userRole || "", // Corrected: Using 'userRole' field
               workEmail: userData.workEmail || "",
               workId: userData.workId || "",
             })
           } else {
-            console.warn("No user data found in either lecturers or students collections for UID:", firebaseUser.uid)
+            console.warn("No user data found in 'users' collection for UID:", firebaseUser.uid)
             setUser({
               name: firebaseUser.displayName || "User",
               email: firebaseUser.email || "",
-              profilePicture: firebaseUser.photoURL || null, // Use null as fallback instead of placeholder image
+              profilePicture: firebaseUser.photoURL || null,
               firstName: "",
               lastName: "",
               institution: "",
@@ -115,11 +93,11 @@ const SettingsScreen = ({ navigation, route }) => {
           }
         } catch (error) {
           console.error("Error fetching user data:", error)
-          console.error("Error details - UID:", firebaseUser.uid, "Error message:", error.message)
+          Alert.alert("Error", "Failed to fetch user data. Please check your connection.")
           setUser({
             name: firebaseUser.displayName || "User",
             email: firebaseUser.email || "",
-            profilePicture: firebaseUser.photoURL || null, // Use null as fallback instead of placeholder image
+            profilePicture: firebaseUser.photoURL || null,
             firstName: "",
             lastName: "",
             institution: "",
@@ -194,12 +172,10 @@ const SettingsScreen = ({ navigation, route }) => {
 
     try {
       if (currentUser) {
-        if (user.userType === "lecturer") {
-          await deleteDoc(doc(FIRESTORE_DB, "lecturers", currentUser.uid))
-        } else if (user.userType === "student") {
-          await deleteDoc(doc(FIRESTORE_DB, "students", currentUser.uid))
-        }
+        // Delete the user's document from the single 'users' collection
+        await deleteDoc(doc(FIRESTORE_DB, "users", currentUser.uid))
 
+        // Delete the user from Firebase Authentication
         await deleteUser(currentUser)
 
         Alert.alert("Account Deleted", "Your account has been permanently deleted.", [

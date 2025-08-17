@@ -14,10 +14,22 @@ import {
   Dimensions,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from "react-native"
 import Ionicons from "react-native-vector-icons/MaterialIcons"
 import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
+import { FIREBASE_AUTH, FIRESTORE_DB } from "../../firebaseConfig"
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  deleteDoc,
+  runTransaction,
+} from "firebase/firestore"
 
 const { height, width } = Dimensions.get("window")
 
@@ -29,7 +41,7 @@ const NotificationToast = ({
   isVisible,
   progress,
 }) => {
-  const slideAnim = useRef(new Animated.Value(-100)).current;
+  const slideAnim = useRef(new Animated.Value(-100)).current
 
   useEffect(() => {
     if (isVisible) {
@@ -37,23 +49,23 @@ const NotificationToast = ({
         toValue: 60,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start()
     } else {
       Animated.timing(slideAnim, {
         toValue: -100,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start()
     }
-  }, [isVisible, slideAnim]);
+  }, [isVisible, slideAnim])
 
   const progressBarWidth = progress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, width - 70],
-  });
+  })
 
   if (!isVisible && slideAnim.__getValue() === -100) {
-    return null;
+    return null
   }
 
   return (
@@ -72,129 +84,17 @@ const NotificationToast = ({
       </View>
       <Animated.View style={[styles.progressBar, { width: progressBarWidth }]} />
     </Animated.View>
-  );
-};
-
-const initialNetworkData = [
-  {
-    id: "1",
-    firstName: "Athalia",
-    lastName: "Putri",
-    status: "Last seen yesterday",
-    online: false,
-    jobTitle: "Software Engineer",
-    institution: "@Tech Solutions Inc",
-    lastActive: "Last active 1d ago",
-    bio: "Passionate software engineer with 5+ years of experience in mobile app development. Specialized in React Native and cross-platform solutions. I love building robust and scalable applications that solve real-world problems. Always eager to learn new technologies and improve my skills. Currently exploring opportunities in AI integration for mobile apps.",
-  },
-  {
-    id: "2",
-    firstName: "Erlan",
-    lastName: "Sadewa",
-    status: "Online",
-    online: true,
-    jobTitle: "Product Designer",
-    institution: "@Creative Studio",
-    lastActive: "Active now",
-    bio: "Creative product designer focused on user experience and interface design. Love creating intuitive and beautiful digital experiences. My passion lies in understanding user needs and translating them into elegant and functional designs. I have a strong portfolio of successful product launches and enjoy collaborating with cross-functional teams.",
-  },
-  {
-    id: "3",
-    firstName: "Midala",
-    lastName: "Huera",
-    status: "Last seen 3 hours ago",
-    online: false,
-    jobTitle: "Data Scientist",
-    institution: "@Analytics Corp",
-    lastActive: "Last active 3h ago",
-    bio: "Data scientist with expertise in machine learning and statistical analysis. Passionate about turning data into actionable insights. I specialize in predictive modeling, data visualization, and building robust data pipelines. My goal is to help businesses make data-driven decisions and unlock new opportunities.",
-  },
-  {
-    id: "4",
-    firstName: "Nafisa",
-    lastName: "Gitari",
-    status: "Online",
-    online: true,
-    jobTitle: "Marketing Manager",
-    institution: "@Brand Agency",
-    lastActive: "Active now",
-    bio: "Strategic marketing professional with a track record of successful campaigns. Specialized in digital marketing and brand development. I excel at creating compelling narratives and executing multi-channel marketing strategies that drive engagement and growth. Always looking for innovative ways to connect with target audiences.",
-  },
-  {
-    id: "5",
-    firstName: "Raki",
-    lastName: "Devon",
-    status: "Online",
-    online: true,
-    jobTitle: "Full Stack Developer",
-    institution: "@DevCorp",
-    lastActive: "Active now",
-    bio: "Full stack developer with expertise in both frontend and backend technologies. Passionate about building scalable web applications. I enjoy working with modern frameworks like React and Node.js, and I'm always keen on optimizing performance and user experience. My experience spans across various industries, delivering robust and efficient solutions.",
-  },
-  {
-    id: "6",
-    firstName: "Salsabila",
-    lastName: "Akira",
-    status: "Last seen 30 minutes ago",
-    online: false,
-    jobTitle: "UX Researcher",
-    institution: "@Design Lab",
-    lastActive: "Last active 30m ago",
-    bio: "UX researcher dedicated to understanding user behavior and improving digital experiences through data-driven insights. I conduct user interviews, usability testing, and data analysis to inform design decisions. My work ensures that products are not only aesthetically pleasing but also highly functional and user-centric.",
-  },
-  {
-    id: "7",
-    firstName: "Arjun",
-    lastName: "Verma",
-    status: "Online",
-    online: true,
-    jobTitle: "DevOps Engineer",
-    institution: "@Cloud Systems",
-    lastActive: "Active now",
-    bio: "DevOps engineer specializing in cloud infrastructure and automation. Experienced in AWS, Docker, and Kubernetes. I focus on streamlining development workflows, ensuring continuous integration and deployment, and maintaining highly available systems. My expertise helps teams deliver software faster and more reliably.",
-  },
-  {
-    id: "8",
-    firstName: "Sophia",
-    lastName: "Liu",
-    status: "Last seen yesterday",
-    online: false,
-    jobTitle: "Business Analyst",
-    institution: "@Consulting Group",
-    lastActive: "Last active 1d ago",
-    bio: "Business analyst with strong analytical skills and experience in process improvement and strategic planning. I bridge the gap between business needs and technical solutions, ensuring projects align with organizational goals. My approach involves thorough data analysis and effective communication to drive successful outcomes.",
-  },
-  {
-    id: "9",
-    firstName: "James",
-    lastName: "Smith",
-    status: "Last seen 2 hours ago",
-    online: false,
-    jobTitle: "Project Manager",
-    institution: "@Tech Innovations",
-    lastActive: "Last active 2h ago",
-    bio: "Experienced project manager with a proven track record of delivering complex projects on time and within budget. I lead cross-functional teams, manage stakeholder expectations, and mitigate risks to ensure project success. My focus is on efficient execution and delivering high-quality results.",
-  },
-  {
-    id: "10",
-    firstName: "Lila",
-    lastName: "Jones",
-    status: "Online",
-    online: true,
-    jobTitle: "Lecturer",
-    institution: "@College of Engineering",
-    lastActive: "Active now",
-    bio: "Experienced professor in engineering and data science. Dedicated to mentoring future leaders in STEM. I teach advanced courses, conduct research, and publish in leading journals. My passion is to inspire the next generation of engineers and scientists to innovate and make a positive impact.",
-  },
-].sort((a, b) => a.firstName.localeCompare(b.firstName))
+  )
+}
 
 const ContactsScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState("")
-  const [allNetworkData, setAllNetworkData] = useState(initialNetworkData)
-  const [filteredData, setFilteredData] = useState(initialNetworkData)
+  const [allNetworkData, setAllNetworkData] = useState([])
+  const [filteredData, setFilteredData] = useState([])
   const [selectedContact, setSelectedContact] = useState(null)
   const [modalVisible, setModalVisible] = useState(false)
   const [modalAnimation] = useState(new Animated.Value(0))
+  const [isLoading, setIsLoading] = useState(true)
 
   // Toast notification states
   const [toastVisible, setToastVisible] = useState(false)
@@ -204,8 +104,73 @@ const ContactsScreen = ({ navigation }) => {
   const [toastIconColor, setToastIconColor] = useState("")
   const toastProgress = useRef(new Animated.Value(0)).current
 
-  // Calculate total notification count (updates + requests)
-  const [totalNotificationCount, setTotalNotificationCount] = useState(8)
+  // Notification count states
+  const [totalNotificationCount, setTotalNotificationCount] = useState(0)
+
+  useEffect(() => {
+    const currentUser = FIREBASE_AUTH.currentUser
+    if (!currentUser) return
+
+    setIsLoading(true)
+
+    // Listener for Network List
+    const networkQuery = query(
+      collection(FIRESTORE_DB, "networks"),
+      where("userId", "==", currentUser.uid),
+    )
+    const unsubscribeNetwork = onSnapshot(networkQuery, async (snapshot) => {
+      // Rebuild the entire list from the snapshot to ensure it's always up-to-date
+      const networkMembersPromises = snapshot.docs.map(async (docRef) => {
+        const networkMemberId = docRef.data().networkMemberId
+        const userDocRef = doc(FIRESTORE_DB, "users", networkMemberId)
+        const userDocSnap = await getDoc(userDocRef)
+
+        if (userDocSnap.exists()) {
+          return {
+            id: userDocSnap.id,
+            // In a real app, you would fetch the email from the user profile document like this:
+            // email: userDocSnap.data().email,
+            // For now, we'll hardcode a dummy email to demonstrate functionality.
+            email: "network.member@example.com",
+            ...userDocSnap.data(),
+          }
+        }
+        return null
+      })
+
+      const newNetworkData = (await Promise.all(networkMembersPromises)).filter(
+        (item) => item !== null,
+      )
+
+      newNetworkData.sort((a, b) => a.firstName.localeCompare(b.firstName))
+      setAllNetworkData(newNetworkData)
+      setFilteredData(newNetworkData)
+      setIsLoading(false)
+    })
+
+    // Listener for Notification Count
+    const updatesQuery = collection(FIRESTORE_DB, "updates")
+    const requestsQuery = query(
+      collection(FIRESTORE_DB, "networkRequests"),
+      where("toUserId", "==", currentUser.uid),
+    )
+
+    const unsubscribeUpdates = onSnapshot(updatesQuery, (updatesSnapshot) => {
+      const unreadUpdates = updatesSnapshot.docs.filter((doc) => !doc.data().read).length
+      setTotalNotificationCount((prev) => unreadUpdates + prev - (prev % 100)) // Reset requests count
+    })
+
+    const unsubscribeRequests = onSnapshot(requestsQuery, (requestsSnapshot) => {
+      const unreadRequests = requestsSnapshot.docs.length
+      setTotalNotificationCount((prev) => prev - (prev % 100) + unreadRequests) // Reset updates count
+    })
+
+    return () => {
+      unsubscribeNetwork()
+      unsubscribeUpdates()
+      unsubscribeRequests()
+    }
+  }, [])
 
   const handleSearch = (text) => {
     setSearchText(text)
@@ -263,48 +228,84 @@ const ContactsScreen = ({ navigation }) => {
   const handleChat = () => {
     closeContactModal()
     if (selectedContact) {
-      // Navigate and pass a clean chatItem object, just like in MapScreen
       navigation.navigate("ChatInterface", {
         chatItem: {
           id: selectedContact.id,
           firstName: selectedContact.firstName,
           lastName: selectedContact.lastName,
-          image: `https://i.pravatar.cc/150?u=${selectedContact.id}`, // Re-create the image URL
-          isOnline: selectedContact.online, // Use the correct property name from your data
+          image: selectedContact.profileImageUrl,
+          isOnline: selectedContact.online,
         },
-      });
-      console.log(`Maps to chat with ${selectedContact?.firstName} ${selectedContact?.lastName}`);
+      })
+      console.log(`Navigating to chat with ${selectedContact?.firstName} ${selectedContact?.lastName}`)
     }
-  };
+  }
 
-  const handleDisconnect = () => {
-    if (selectedContact) {
-      const updatedNetwork = allNetworkData.filter((contact) => contact.id !== selectedContact.id)
-      setAllNetworkData(updatedNetwork)
-      setFilteredData(updatedNetwork)
+  const handleDisconnect = async () => {
+    const currentUser = FIREBASE_AUTH.currentUser
+    if (!currentUser || !selectedContact) return
+
+    try {
+      await runTransaction(FIRESTORE_DB, async (transaction) => {
+        const networkRef1 = doc(
+          FIRESTORE_DB,
+          "networks",
+          `${currentUser.uid}_${selectedContact.id}`,
+        )
+        const networkRef2 = doc(
+          FIRESTORE_DB,
+          "networks",
+          `${selectedContact.id}_${currentUser.uid}`,
+        )
+
+        transaction.delete(networkRef1)
+        transaction.delete(networkRef2)
+      })
+
       closeContactModal()
       showToastNotification(selectedContact.firstName)
       console.log(`Disconnected from ${selectedContact?.firstName} ${selectedContact?.lastName}`)
+    } catch (error) {
+      console.error("Error disconnecting:", error)
+      alert("Failed to disconnect from user. Please try again.")
     }
   }
 
   const renderContactItem = ({ item }) => {
-    const avatarUrl = `https://i.pravatar.cc/150?u=${item.id}`
+    const avatar = item.profileImageUrl
+      ? { uri: item.profileImageUrl }
+      : null
     return (
       <TouchableOpacity
         style={styles.contactItem}
         onPress={() => openContactModal(item)}
         activeOpacity={0.7}
       >
-        <Image source={{ uri: avatarUrl }} style={styles.profileImage} />
+        {avatar ? (
+          <Image source={avatar} style={styles.profileImage} />
+        ) : (
+          <View style={styles.defaultProfileImage}>
+            <Ionicons name="person" size={30} color="#000" />
+          </View>
+        )}
         <View style={styles.contactDetails}>
           <Text style={styles.contactName}>
             {item.firstName} {item.lastName}
           </Text>
-          <Text style={styles.contactStatus}>{item.status}</Text>
+          <Text style={styles.contactUserRole}>{item.userRole}</Text>
+          <Text style={styles.contactInstitution}>{item.institution}</Text>
         </View>
         {item.online && <View style={styles.onlineIndicator} />}
       </TouchableOpacity>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text style={styles.loadingText}>Loading network...</Text>
+      </View>
     )
   }
 
@@ -314,15 +315,23 @@ const ContactsScreen = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Network</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate("Notifications")}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate("Notifications")}
+          >
             <Ionicons name="notifications" size={28} color="#fff" />
             {totalNotificationCount > 0 && (
               <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>{totalNotificationCount > 99 ? "99+" : totalNotificationCount}</Text>
+                <Text style={styles.badgeText}>
+                  {totalNotificationCount > 99 ? "99+" : totalNotificationCount}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate("AddNetwork")}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate("AddNetwork")}
+          >
             <Ionicons name="person-add" size={28} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -350,7 +359,10 @@ const ContactsScreen = ({ navigation }) => {
           extraData={filteredData}
         />
       )}
-      <TouchableOpacity style={styles.floatingButton} onPress={() => navigation.navigate("AddNetwork")}>
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={() => navigation.navigate("AddNetwork")}
+      >
         <Ionicons name="person-add" size={30} color="#000" />
       </TouchableOpacity>
 
@@ -395,17 +407,29 @@ const ContactsScreen = ({ navigation }) => {
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderContent}>
-                  <Image
-                    source={{ uri: `https://i.pravatar.cc/150?u=${selectedContact?.id}` }}
-                    style={styles.modalProfileImage}
-                  />
+                  {selectedContact?.profileImageUrl ? (
+                    <Image
+                      source={{ uri: selectedContact.profileImageUrl }}
+                      style={styles.modalProfileImage}
+                    />
+                  ) : (
+                    <View style={styles.defaultModalProfileImage}>
+                      <Ionicons name="person" size={40} color="#000" />
+                    </View>
+                  )}
                   <View style={styles.modalContactInfo}>
                     <Text style={styles.modalContactName}>
                       {selectedContact?.firstName} {selectedContact?.lastName}
                     </Text>
-                    <Text style={styles.modalJobTitle}>{selectedContact?.jobTitle}</Text>
-                    <Text style={styles.modalInstitution}>{selectedContact?.institution}</Text>
-                    <Text style={styles.modalLastActive}>{selectedContact?.lastActive}</Text>
+                    <Text style={styles.modalUserRole}>
+                      {selectedContact?.userRole}
+                    </Text>
+                    <Text style={styles.modalEmail}>
+                      {selectedContact?.email}
+                    </Text>
+                    <Text style={styles.modalInstitution}>
+                      {selectedContact?.institution}
+                    </Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeButton} onPress={closeContactModal}>
@@ -442,6 +466,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#121212",
     paddingTop: 60,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#121212",
+  },
+  loadingText: {
+    marginTop: 10,
+    color: "#fff",
+    fontSize: 16,
   },
   header: {
     flexDirection: "row",
@@ -517,6 +552,15 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 15,
   },
+  defaultProfileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+  },
   contactDetails: {
     flex: 1,
   },
@@ -525,9 +569,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#fff",
   },
-  contactStatus: {
+  contactUserRole: {
     fontSize: 14,
     color: "#888",
+    marginTop: 2,
+  },
+  contactInstitution: {
+    fontSize: 14,
+    color: "#888",
+    marginTop: 2,
   },
   onlineIndicator: {
     width: 15,
@@ -598,6 +648,15 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     marginRight: 16,
   },
+  defaultModalProfileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
   modalContactInfo: {
     flex: 1,
   },
@@ -607,8 +666,13 @@ const styles = StyleSheet.create({
     color: "#000",
     marginBottom: 4,
   },
-  modalJobTitle: {
+  modalUserRole: {
     fontSize: 16,
+    color: "#000",
+    marginBottom: 2,
+  },
+  modalEmail: {
+    fontSize: 14,
     color: "#000",
     marginBottom: 2,
   },
@@ -674,33 +738,32 @@ const styles = StyleSheet.create({
   },
   // Styles for NotificationToast (moved here)
   toastContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
     zIndex: 1000,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   toastContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
   },
   toastIconWrapper: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 15,
   },
   toastTextContainer: {
@@ -708,27 +771,27 @@ const styles = StyleSheet.create({
   },
   toastTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 2,
   },
   toastMessage: {
     fontSize: 14,
-    color: '#111',
+    color: "#111",
   },
   toastCheckIconWrapper: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginLeft: 10,
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     borderRadius: 2,
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
   },

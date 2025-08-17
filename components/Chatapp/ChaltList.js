@@ -680,9 +680,6 @@ const ChatListScreen = ({ navigation }) => {
               ]}
             >
               <Text style={styles.headerTitle}>{activeFilter === "Archived" ? "Archived Chats" : "Chats"}</Text>
-              <TouchableOpacity style={styles.profileButton}>
-                <Image source={{ uri: "https://i.pravatar.cc/40?img=1" }} style={styles.profileImage} />
-              </TouchableOpacity>
             </Animated.View>
 
             {/* Selection Header */}
@@ -883,6 +880,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 2,
+    marginBottom: 30
   },
   headerTitle: {
     fontSize: 28,
@@ -923,7 +921,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginTop: Platform.OS === "ios" ? 100 : StatusBar.currentHeight + 40,
+    marginTop: Platform.OS === "ios" ? 110 : StatusBar.currentHeight + 40,
   },
   searchContainer: {
     flexDirection: "row",

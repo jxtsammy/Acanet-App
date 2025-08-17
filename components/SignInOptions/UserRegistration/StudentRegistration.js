@@ -34,10 +34,8 @@ import {
 
 // Import Firebase services and functions
 import {
-  FIREBASE_APP,
   FIREBASE_AUTH,
   FIRESTORE_DB,
-  FIREBASE_STORAGE
 } from '../../../firebaseConfig';
 
 // Import individual Firebase functions
@@ -45,7 +43,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-const RegisterScreen = ({ navigation }) => {
+const StudentRegisterScreen = ({ navigation }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -137,7 +135,8 @@ const RegisterScreen = ({ navigation }) => {
       const profileImageUrl = profileImage;
 
       // 2. Store additional user data in Firestore
-      await setDoc(doc(FIRESTORE_DB, 'students', user.uid), {
+      // UPDATED: Collection name changed to 'users' and userRole set to 'lecturer'
+      await setDoc(doc(FIRESTORE_DB, 'users', user.uid), {
         firstName,
         lastName,
         email,
@@ -145,6 +144,7 @@ const RegisterScreen = ({ navigation }) => {
         studentId,
         bio,
         phoneNumber,
+        userRole: 'student', // New field added as requested
         profileImageUrl, // Store the local URI or null if no image was selected
         termsAgreed,
         createdAt: new Date(),
@@ -705,4 +705,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RegisterScreen;
+export default StudentRegisterScreen;

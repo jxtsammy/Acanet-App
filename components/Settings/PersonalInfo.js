@@ -26,7 +26,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 const PersonalInfoScreen = ({ navigation, route }) => {
   const [currentUser, setCurrentUser] = useState(null)
-  const [userType, setUserType] = useState(null)
+  const [userRole, setUserRole] = useState(null) // Renamed from userType for clarity
   const [loading, setLoading] = useState(false)
 
   const [firstName, setFirstName] = useState("")
@@ -36,13 +36,15 @@ const PersonalInfoScreen = ({ navigation, route }) => {
   const [institutionId, setInstitutionId] = useState("")
   const [bio, setBio] = useState("")
   const [profilePicture, setProfilePicture] = useState("")
-  const [workEmail, setWorkEmail] = useState("")
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, async (firebaseUser) => {
       if (firebaseUser) {
         setCurrentUser(firebaseUser)
         await loadUserData(firebaseUser)
+      } else {
+        // Handle case where user is not logged in
+        // e.g., navigate to login screen
       }
     })
 
@@ -53,48 +55,37 @@ const PersonalInfoScreen = ({ navigation, route }) => {
     try {
       console.log("Loading user data for UID:", user.uid)
 
-      // Check lecturers collection first
-      const lecturerDoc = await getDoc(doc(FIRESTORE_DB, "lecturers", user.uid))
+      // Access the single 'users' collection
+      const userRef = doc(FIRESTORE_DB, "users", user.uid)
+      const userDoc = await getDoc(userRef)
 
-      if (lecturerDoc.exists()) {
-        const userData = lecturerDoc.data()
-        console.log("Found lecturer data:", userData)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        console.log("Found user data:", userData)
 
-        setUserType("lecturer")
+        // Set the user role and populate state
+        setUserRole(userData.userRole || null)
         setFirstName(userData.firstName || "")
         setLastName(userData.lastName || "")
-        setEmail(userData.workEmail || userData.email || "")
         setInstitution(userData.institution || "")
-        setInstitutionId(userData.workId || "")
         setBio(userData.bio || "")
         setProfilePicture(userData.profileImageUrl || "")
-        setWorkEmail(userData.workEmail || "")
-        return
-      }
 
-      // Check students collection
-      const studentDoc = await getDoc(doc(FIRESTORE_DB, "students", user.uid))
-
-      if (studentDoc.exists()) {
-        const userData = studentDoc.data()
-        console.log("Found student data:", userData)
-
-        setUserType("student")
-        setFirstName(userData.firstName || "")
-        setLastName(userData.lastName || "")
-        setEmail(userData.email || "")
-        setInstitution(userData.institution || "")
-        setInstitutionId(userData.studentId || "")
-        setBio(userData.bio || "")
-        setProfilePicture(userData.profileImageUrl || "")
-        setWorkEmail("")
+        // Handle type-specific fields
+        if (userData.userRole === "lecturer") {
+          setEmail(userData.workEmail || userData.email || "")
+          setInstitutionId(userData.workId || "")
+        } else if (userData.userRole === "student") {
+          setEmail(userData.email || "")
+          setInstitutionId(userData.studentId || "")
+        }
       } else {
-        console.log("No user data found in either collection")
-        Alert.alert("Error", "User data not found")
+        console.log("No user data found in 'users' collection")
+        Alert.alert("Error", "User data not found. Please log in again.")
       }
     } catch (error) {
       console.error("Error loading user data:", error)
-      Alert.alert("Error", "Failed to load user data")
+      Alert.alert("Error", "Failed to load user data. Please check your connection.")
     }
   }
 
@@ -155,7 +146,7 @@ const PersonalInfoScreen = ({ navigation, route }) => {
       return
     }
 
-    if (!currentUser || !userType) {
+    if (!currentUser || !userRole) {
       Alert.alert("Error", "User authentication error. Please try again.")
       return
     }
@@ -170,7 +161,7 @@ const PersonalInfoScreen = ({ navigation, route }) => {
         profileImageUrl = await uploadProfilePicture(profilePicture)
       }
 
-      // Prepare update data based on user type
+      // Prepare the data to update the single 'users' document
       const updateData = {
         firstName,
         lastName,
@@ -179,22 +170,32 @@ const PersonalInfoScreen = ({ navigation, route }) => {
         profileImageUrl,
       }
 
-      // Add type-specific fields
-      if (userType === "student") {
-        updateData.studentId = institutionId
-        updateData.email = email
-      } else if (userType === "lecturer") {
+      // Add role-specific fields
+      if (userRole === "lecturer") {
         updateData.workId = institutionId
         updateData.workEmail = email
-        updateData.email = email // Keep both for compatibility
+      } else if (userRole === "student") {
+        updateData.studentId = institutionId
+        updateData.email = email
       }
 
-      // Update the appropriate collection
-      const collectionName = userType === "lecturer" ? "lecturers" : "students"
-      await updateDoc(doc(FIRESTORE_DB, collectionName, currentUser.uid), updateData)
+      // Update the user's document in the single 'users' collection
+      await updateDoc(doc(FIRESTORE_DB, "users", currentUser.uid), updateData)
 
-      // Navigate back to settings
-      navigation.goBack()
+      // Navigate back to settings screen and pass updated data
+      navigation.navigate("Settings", {
+        updatedUser: {
+          ...route.params.user,
+          firstName,
+          lastName,
+          institution,
+          institutionId,
+          bio,
+          email,
+          profilePicture: profileImageUrl,
+          userType: userRole,
+        },
+      })
 
       // Show success message
       Alert.alert("Success", "Your personal information has been updated.")
@@ -276,12 +277,12 @@ const PersonalInfoScreen = ({ navigation, route }) => {
                 </View>
 
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>{userType === "lecturer" ? "Work Email" : "Email"}</Text>
+                  <Text style={styles.inputLabel}>{userRole === "lecturer" ? "Work Email" : "Email"}</Text>
                   <View style={styles.inputContainer}>
                     <Icon name="mail-outline" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder={userType === "lecturer" ? "Enter your work email" : "Enter your email"}
+                      placeholder={userRole === "lecturer" ? "Enter your work email" : "Enter your email"}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={email}
                       onChangeText={setEmail}
@@ -311,12 +312,12 @@ const PersonalInfoScreen = ({ navigation, route }) => {
 
                 {/* Institution ID Field */}
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.inputLabel}>{userType === "lecturer" ? "Work ID" : "Student ID"}</Text>
+                  <Text style={styles.inputLabel}>{userRole === "lecturer" ? "Work ID" : "Student ID"}</Text>
                   <View style={styles.inputContainer}>
                     <Icon name="badge" size={20} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder={`Enter your ${userType === "lecturer" ? "work" : "student"} ID`}
+                      placeholder={`Enter your ${userRole === "lecturer" ? "work" : "student"} ID`}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={institutionId}
                       onChangeText={setInstitutionId}
