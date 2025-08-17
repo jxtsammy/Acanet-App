@@ -711,8 +711,7 @@ const styles = StyleSheet.create({
   },
   disconnectButtonText: {
     color: "#000",
-    fontSize: 22,
-    fontWeight: "600",
+    fontSize: 20,
   },
   chatButton: {
     width: 90,
