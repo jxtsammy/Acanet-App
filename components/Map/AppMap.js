@@ -1,6 +1,6 @@
 "use client"
 import { useRef, useState } from "react"
-import { View, StyleSheet, Image, Text, ScrollView, TouchableOpacity, Animated, Easing, TextInput } from "react-native"
+import { View, StyleSheet, Image, Text, ScrollView, TouchableOpacity, Animated, Easing, StatusBar } from "react-native"
 import MapView, { Marker } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons" // Icons
 import { useNavigation } from "@react-navigation/native" // Import useNavigation
@@ -288,7 +288,7 @@ const MapScreen = () => {
         },
         // The onMessageUpdate function is not defined in this component.
         // If you need it, you should pass it as a prop from a parent component.
-        // onMessageUpdate: updateChatWithMessage, 
+        // onMessageUpdate: updateChatWithMessage,
       });
     }
   };
@@ -300,6 +300,7 @@ const MapScreen = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
       {/* Enhanced Custom Notification */}
       {notification.visible && (
         <Animated.View
@@ -356,13 +357,6 @@ const MapScreen = () => {
           </View>
         </Animated.View>
       )}
-      {/* Floating Search Bar */}
-      <View style={styles.searchBar}>
-        <TextInput style={styles.searchInput} placeholder="Search..." placeholderTextColor="#999" />
-        <View style={styles.searchIcon}>
-          <Icon name="search" size={28} color="#000" />
-        </View>
-      </View>
       {/* Map */}
       <MapView
         style={styles.map}
@@ -528,36 +522,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   // Existing styles
-  searchBar: {
-    position: "absolute",
-    top: 65,
-    left: "10%",
-    right: "10%",
-    height: 55,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#000",
-    borderRadius: 30,
-    paddingHorizontal: 10,
-    elevation: 5,
-    zIndex: 1,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 16,
-    color: "#fff",
-    padding: 10,
-  },
-  searchIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 30,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    left: 5,
-  },
   map: { flex: 1 },
   markerPicture: { width: 55, height: 55, borderRadius: 60 },
   bottomContainer: {
