@@ -23,10 +23,6 @@ import {
   getDocs,
 } from "firebase/firestore"
 import { getAuth, sendPasswordResetEmail } from "firebase/auth"
-
-// Importing Firebase services from your external file.
-// Adjust the path below to match your project structure.
-// NOTE: Make sure your firebaseConfig file also exports FIRESTORE_DB and FIREBASE_APP
 import { FIRESTORE_DB, FIREBASE_APP } from "../../firebaseConfig"
 
 // Get the Firebase Auth instance
@@ -71,64 +67,66 @@ const ForgotPasswordScreen = ({ navigation }) => {
     setForgotLoading(true)
 
     try {
-      // Query Firestore for a user document where the email matches the entered email.
       const usersRef = collection(FIRESTORE_DB, "users")
-      const q = query(usersRef, where("email", "==", email.toLowerCase()))
-      const querySnapshot = await getDocs(q)
+      const normalizedEnteredId = enteredId.trim().toLowerCase();
+
+      // Query for the user document based on either studentId or workId
+      const qStudent = query(usersRef, where("studentId", "==", normalizedEnteredId));
+      const qLecturer = query(usersRef, where("workId", "==", normalizedEnteredId));
+
+      const [snapshotStudent, snapshotLecturer] = await Promise.all([
+        getDocs(qStudent),
+        getDocs(qLecturer)
+      ]);
+
+      const querySnapshot = snapshotStudent.empty ? snapshotLecturer : snapshotStudent;
 
       if (querySnapshot.empty) {
-        Alert.alert("Error", "User isn't found.")
-        return
+        Alert.alert("Error", "User isn't found.");
+        return;
       }
 
-      // Get the user document and verify the ID based on the user's role
-      const userDoc = querySnapshot.docs[0]
-      const userData = userDoc.data()
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
 
-      // Log all relevant data for debugging
       console.log("--- Debugging Forgot Password Check ---");
       console.log("Database user data:", userData);
       console.log("Entered email:", email);
       console.log("Entered ID:", enteredId);
+      console.log("User role from DB:", userData.userRole);
 
-      // Normalize the entered ID and database IDs for a reliable comparison
-      const normalizedEnteredId = enteredId.trim().toLowerCase();
-      const normalizedStudentId = userData.studentId?.trim().toLowerCase();
-      const normalizedWorkId = userData.workId?.trim().toLowerCase();
-
-      console.log("Normalized entered ID:", normalizedEnteredId);
-      console.log("Normalized student ID from DB:", normalizedStudentId);
-      console.log("Normalized work ID from DB:", normalizedWorkId);
-
-      let isIdCorrect = false;
-      // Normalize the userRole from the database to ensure case-insensitive matching
+      // Check if the entered email matches the correct email field based on the user's role
+      let emailFromDb;
       const userRole = userData.userRole?.toLowerCase();
 
-      if (userRole === "student" && normalizedStudentId === normalizedEnteredId) {
-        isIdCorrect = true;
-      } else if (userRole === "lecturer" && normalizedWorkId === normalizedEnteredId) {
-        isIdCorrect = true;
+      if (userRole === "student") {
+        emailFromDb = userData.email?.toLowerCase();
+      } else if (userRole === "lecturer") {
+        emailFromDb = userData.workEmail?.toLowerCase();
+      } else {
+        Alert.alert("Error", "User role not recognized.");
+        return;
       }
 
-      console.log("Is ID correct?", isIdCorrect);
+      console.log("Email from DB:", emailFromDb);
 
-      if (!isIdCorrect) {
-        Alert.alert("Error", "User isn't found.")
+      if (email.toLowerCase() !== emailFromDb) {
+        Alert.alert("Error", "The entered email does not match the provided ID. Please try again.");
         return;
       }
 
       // If everything is correct, send the password reset email
-      await sendPasswordResetEmail(FIREBASE_AUTH, email.toLowerCase())
-      Alert.alert("Success", "A password reset link has been sent to your email. Please check your inbox.")
+      await sendPasswordResetEmail(FIREBASE_AUTH, email.toLowerCase());
+      Alert.alert("Success", "A password reset link has been sent to your email. Please check your inbox.");
 
       // Navigate to a success screen or back to the login screen
-      navigation.navigate("ResetSuccess")
+      navigation.navigate("ResetSuccess");
 
     } catch (error) {
-      console.error("Forgot password error:", error)
-      Alert.alert("Error", "Failed to verify your information. Please try again.")
+      console.error("Forgot password error:", error);
+      Alert.alert("Error", "Failed to verify your information. Please try again.");
     } finally {
-      setForgotLoading(false)
+      setForgotLoading(false);
     }
   }
 
@@ -154,7 +152,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
             <View style={styles.illustrationContainer}>
               {/* Note: The 'require' for local assets is replaced with a placeholder URL
               for this environment. You should change this back in your project. */}
-              <Image source={require("../../assets/rsi.png")} style={styles.illustrationImage} resizeMode="contain" />
+              <Image source={{ uri: "https://placehold.co/400x250/E0E0E0/333333?text=RSI" }} style={styles.illustrationImage} resizeMode="contain" />
             </View>
 
             <Text style={styles.title}>Forgot Password</Text>

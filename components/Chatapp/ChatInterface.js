@@ -734,7 +734,7 @@ const ChatScreen = ({ route, navigation }) => {
   const { chatItem } = route.params || {
     firstName: "Alex",
     lastName: "Morgan",
-    image: "https://i.pravatar.cc/300?img=12",
+    image: null, // Changed to null to show default avatar
     isOnline: true,
   }
 
@@ -755,7 +755,7 @@ const ChatScreen = ({ route, navigation }) => {
   const [typingTimeout, setTypingTimeout] = useState(null)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
 
-  // Audio recording states - ENHANCED
+  // Audio recording states - ENHANCED for iOS support
   const [recording, setRecording] = useState(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
@@ -765,7 +765,6 @@ const ChatScreen = ({ route, navigation }) => {
   // Media preview states (removed for images, kept for documents/audio if needed)
   const [mediaPreview, setMediaPreview] = useState(null)
   const [previewCaption, setPreviewCaption] = useState("")
-  // const [showMediaPreview, setShowMediaPreview] = useState(false) // Removed for images
 
   // Image modal states
   const [selectedImage, setSelectedImage] = useState(null)
@@ -778,7 +777,7 @@ const ChatScreen = ({ route, navigation }) => {
   const [playbackPosition, setPlaybackPosition] = useState({})
   const [playbackDuration, setPlaybackDuration] = useState({})
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState(null)
-  const [audioFinished, setAudioFinished] = useState({}) // NEW: Track finished audio
+  const [audioFinished, setAudioFinished] = useState({})
 
   // Scroll to bottom states
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -799,7 +798,7 @@ const ChatScreen = ({ route, navigation }) => {
   const durationTimer = useRef(null)
   const scrollViewRef = useRef()
 
-  // NEW: Text input ref for focus management
+  // Text input ref for focus management
   const textInputRef = useRef(null)
 
   // ENHANCED Keyboard listeners
@@ -807,7 +806,6 @@ const ChatScreen = ({ route, navigation }) => {
     const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", (e) => {
       setKeyboardHeight(e.endCoordinates.height)
       setIsKeyboardVisible(true)
-      // Close emoji picker when keyboard shows
       if (showEmojiPicker) {
         setShowEmojiPicker(false)
       }
@@ -827,19 +825,16 @@ const ChatScreen = ({ route, navigation }) => {
   const handleTextChange = (text) => {
     setInputText(text)
 
-    // Clear existing timeout
     if (typingTimeout) {
       clearTimeout(typingTimeout)
     }
 
-    // Set user as typing
     if (!isUserTyping && text.length > 0) {
       setIsUserTyping(true)
       setIsTyping(true)
       setTypingUser("user")
     }
 
-    // Set timeout to stop typing indicator
     const timeout = setTimeout(() => {
       setIsUserTyping(false)
       setIsTyping(false)
@@ -850,17 +845,14 @@ const ChatScreen = ({ route, navigation }) => {
 
   // ENHANCED Emoji button handler
   const handleEmojiButtonPress = () => {
-    if (isRecording) return // Don't allow emoji picker during recording
+    if (isRecording) return
 
-    // IMPROVEMENT 1: Close attachment options when opening emoji picker
     if (showAttachmentOptions) {
       setShowAttachmentOptions(false)
     }
 
-    // Always show emoji picker and push input container up
     setShowEmojiPicker(true)
 
-    // If keyboard is visible, dismiss it first
     if (isKeyboardVisible) {
       Keyboard.dismiss()
     }
@@ -869,7 +861,6 @@ const ChatScreen = ({ route, navigation }) => {
   // ENHANCED Keyboard button handler (when emoji picker is open)
   const handleKeyboardButtonPress = () => {
     setShowEmojiPicker(false)
-    // Focus on text input to show keyboard
     setTimeout(() => {
       textInputRef.current?.focus()
     }, 100)
@@ -877,20 +868,19 @@ const ChatScreen = ({ route, navigation }) => {
 
   // ENHANCEMENT: Handle attachment button press
   const handleAttachmentButtonPress = () => {
-    // IMPROVEMENT 1: Close emoji picker when opening attachment options
     if (showEmojiPicker) {
       setShowEmojiPicker(false)
     }
     setShowAttachmentOptions(!showAttachmentOptions)
   }
 
-  // Generate enhanced waveform data - IMPROVEMENT: More consistent pattern
+  // Generate enhanced waveform data
   function generateEnhancedWaveform(count) {
-    const baseHeights = [0.3, 0.6, 0.9, 0.7, 0.4, 0.2, 0.5, 0.8, 0.6, 0.3] // A repeating pattern
+    const baseHeights = [0.3, 0.6, 0.9, 0.7, 0.4, 0.2, 0.5, 0.8, 0.6, 0.3]
     return Array(count)
       .fill(0)
       .map((_, i) => ({
-        height: baseHeights[i % baseHeights.length], // Use modulo to repeat the pattern
+        height: baseHeights[i % baseHeights.length],
       }))
   }
 
@@ -909,7 +899,6 @@ const ChatScreen = ({ route, navigation }) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent
     const isScrolledToBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 50
     setIsAtBottom(isScrolledToBottom)
-    // The scroll button visibility is now handled by a separate useEffect
   }
 
   // Scroll to bottom function
@@ -917,8 +906,6 @@ const ChatScreen = ({ route, navigation }) => {
     scrollViewRef.current?.scrollToEnd({ animated: true })
   }
 
-  // IMPROVEMENT 2: Auto-scroll to bottom on component mount and new messages
-  // IMPROVEMENT: Pre-load audio for faster playback
   useEffect(() => {
     const initialMessages = [
       {
@@ -947,40 +934,7 @@ const ChatScreen = ({ route, navigation }) => {
         audioUri: "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
       },
       {
-        id: "4",
-        time: "8:14 PM",
-        isUser: false,
-        isRead: true,
-        type: "audio",
-        waveform: generateEnhancedWaveform(35),
-        audioUri: "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
-      },
-      {
         id: "5",
-        text: "That sounds amazing! 🎉",
-        time: "8:15 PM",
-        isUser: false,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "6",
-        text: "I'll send you the details tomorrow morning",
-        time: "8:16 PM",
-        isUser: true,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "7",
-        text: "Looking forward to seeing the final results! Can't wait to review everything.",
-        time: "11:31 PM",
-        isUser: false,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "8",
         time: "11:31 PM",
         isUser: false,
         isRead: false,
@@ -1010,7 +964,7 @@ const ChatScreen = ({ route, navigation }) => {
         ]).start()
       }, index * 100)
 
-      // IMPROVEMENT: Pre-load audio for all audio messages
+      // Pre-load audio for all audio messages
       if (message.type === "audio" && message.audioUri) {
         const loadAudio = async () => {
           try {
@@ -1020,7 +974,6 @@ const ChatScreen = ({ route, navigation }) => {
               (status) => onPlaybackStatusUpdate(message.id, status),
             )
             setSoundObjects((prev) => ({ ...prev, [message.id]: newSound }))
-            // Get initial duration
             const status = await newSound.getStatusAsync()
             if (status.isLoaded) {
               setPlaybackDuration((prev) => ({ ...prev, [message.id]: status.durationMillis / 1000 }))
@@ -1033,7 +986,6 @@ const ChatScreen = ({ route, navigation }) => {
       }
     })
 
-    // IMPROVEMENT 2: Auto-scroll to bottom when component loads
     setTimeout(() => {
       scrollToBottom()
     }, 500)
@@ -1048,7 +1000,6 @@ const ChatScreen = ({ route, navigation }) => {
     }
   }, [])
 
-  // IMPROVEMENT 2: Auto-scroll when new messages are added
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => {
@@ -1057,10 +1008,8 @@ const ChatScreen = ({ route, navigation }) => {
     }
   }, [messages.length])
 
-  // NEW: Effect to control scroll button visibility
   useEffect(() => {
     if (!isAtBottom && messages.length > 5) {
-      // Only show if not at bottom and enough messages
       Animated.spring(scrollButtonScale, {
         toValue: 1,
         tension: 100,
@@ -1076,25 +1025,34 @@ const ChatScreen = ({ route, navigation }) => {
     }
   }, [isAtBottom, messages.length])
 
-  // Setup audio configuration
+  // ENHANCED Setup audio configuration for iOS and Android
   const setupAudio = async () => {
     try {
       const { status } = await Audio.requestPermissionsAsync()
       if (status !== "granted") {
-        alert("Permission to access microphone is required!")
-        return
+        Alert.alert(
+          "Permission Required",
+          "Microphone access is required for voice recording. Please enable it in your device settings.",
+          [{ text: "OK" }],
+        )
+        return false
       }
+
+      // Enhanced audio mode setup for both iOS and Android
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: true,
-        staysActiveInBackground: true,
-        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
-        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DUCK_OTHERS,
+        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
       })
+      return true
     } catch (error) {
       console.log("Audio setup error:", error)
+      Alert.alert("Audio Setup Error", "Failed to initialize audio recording. Please try again.")
+      return false
     }
   }
 
@@ -1333,12 +1291,10 @@ const ChatScreen = ({ route, navigation }) => {
   // Handle emoji selection
   const handleEmojiSelect = (emoji) => {
     setInputText((prev) => prev + emoji)
-    // Add to recent emojis
     setRecentEmojis((prev) => {
       const filtered = prev.filter((e) => e !== emoji)
       return [emoji, ...filtered].slice(0, 20)
     })
-    // Update the Recent category
     EMOJI_CATEGORIES.Recent = recentEmojis
   }
 
@@ -1371,12 +1327,6 @@ const ChatScreen = ({ route, navigation }) => {
     cancelSelection()
   }
 
-  // Handle favorite messages
-  const handleFavoriteMessages = () => {
-    Alert.alert("Favorite", "Messages added to favorites!")
-    cancelSelection()
-  }
-
   // Handle reply to selected message
   const handleReplyToSelected = () => {
     if (selectedMessages.length === 1) {
@@ -1391,11 +1341,46 @@ const ChatScreen = ({ route, navigation }) => {
     return selectedMessages.length === 1
   }
 
-  // ENHANCED Start recording audio - single press
+  // ENHANCED Start recording audio - iOS and Android compatible
   const startRecording = async () => {
     try {
+      const audioSetupSuccess = await setupAudio()
+      if (!audioSetupSuccess) {
+        return
+      }
+
       await stopAllAudio()
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
+
+      // Enhanced recording options for better iOS compatibility
+      const recordingOptions = {
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        // iOS specific optimizations
+        ...(Platform.OS === "ios" && {
+          ios: {
+            extension: ".m4a",
+            audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
+            sampleRate: 44100,
+            numberOfChannels: 1,
+            bitRate: 128000,
+            linearPCMBitDepth: 16,
+            linearPCMIsBigEndian: false,
+            linearPCMIsFloat: false,
+          },
+        }),
+        // Android specific optimizations
+        ...(Platform.OS === "android" && {
+          android: {
+            extension: ".m4a",
+            outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
+            audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+            sampleRate: 44100,
+            numberOfChannels: 1,
+            bitRate: 128000,
+          },
+        }),
+      }
+
+      const { recording } = await Audio.Recording.createAsync(recordingOptions)
       setRecording(recording)
       setIsRecording(true)
       setRecordingStarted(true)
@@ -1405,7 +1390,11 @@ const ChatScreen = ({ route, navigation }) => {
       }, 1000)
     } catch (err) {
       console.error("Failed to start recording", err)
-      Alert.alert("Failed to start recording.", "Please check microphone permissions.")
+      Alert.alert(
+        "Recording Failed",
+        `Unable to start voice recording. ${Platform.OS === "ios" ? "Please check microphone permissions in Settings." : "Please check microphone permissions."}`,
+        [{ text: "OK" }],
+      )
     }
   }
 
@@ -1426,6 +1415,7 @@ const ChatScreen = ({ route, navigation }) => {
       setRecordingDuration(0)
     } catch (err) {
       console.error("Failed to stop recording", err)
+      Alert.alert("Recording Error", "Failed to save voice recording. Please try again.")
     }
   }
 
@@ -1467,8 +1457,6 @@ const ChatScreen = ({ route, navigation }) => {
     }
   }
 
-  // IMPROVEMENT 3: Enhanced audio playback with auto-restart for finished audio
-  // RESTORED: Voice note playing animation to previous state
   const playAudio = async (messageId, uri) => {
     try {
       if (isPlaying[messageId]) {
@@ -1484,7 +1472,6 @@ const ChatScreen = ({ route, navigation }) => {
       await stopAllAudio()
 
       let sound = soundObjects[messageId]
-      // IMPROVEMENT 3: If audio was finished, reset to beginning
       if (audioFinished[messageId]) {
         if (sound) {
           await sound.setPositionAsync(0)
@@ -1498,7 +1485,6 @@ const ChatScreen = ({ route, navigation }) => {
           console.log("No audio URI provided for message:", messageId)
           return
         }
-        // IMPROVEMENT: Audio is now pre-loaded, so this block should ideally not be hit often
         const { sound: newSound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: false }, (status) =>
           onPlaybackStatusUpdate(messageId, status),
         )
@@ -1511,7 +1497,7 @@ const ChatScreen = ({ route, navigation }) => {
       setCurrentlyPlayingId(messageId)
     } catch (err) {
       console.error("Failed to play audio:", err)
-      Alert.alert("Failed to play audio.", "The audio file might be corrupted or unavailable.")
+      Alert.alert("Playback Error", "Failed to play audio. The file might be corrupted or unavailable.")
     }
   }
 
@@ -1533,8 +1519,6 @@ const ChatScreen = ({ route, navigation }) => {
     }
   }
 
-  // IMPROVEMENT 3: Enhanced playback status update with finished tracking
-  // RESTORED: Voice note playing animation to previous state
   const onPlaybackStatusUpdate = (messageId, status) => {
     if (status.isLoaded) {
       const position = status.positionMillis / 1000
@@ -1551,7 +1535,6 @@ const ChatScreen = ({ route, navigation }) => {
       if (status.didJustFinish) {
         setIsPlaying((prev) => ({ ...prev, [messageId]: false }))
         setPlaybackPosition((prev) => ({ ...prev, [messageId]: 0 }))
-        // IMPROVEMENT 3: Mark audio as finished
         setAudioFinished((prev) => ({ ...prev, [messageId]: true }))
         if (currentlyPlayingId === messageId) {
           setCurrentlyPlayingId(null)
@@ -1567,7 +1550,6 @@ const ChatScreen = ({ route, navigation }) => {
     }
   }
 
-  // IMPROVEMENT: Auto-send image after selection, remove preview modal
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -1577,17 +1559,16 @@ const ChatScreen = ({ route, navigation }) => {
       })
 
       if (!result.canceled) {
-        // Directly send the image message without a preview modal
         sendMediaMessage({
           type: "image",
           uri: result.assets[0].uri,
-          caption: "", // No caption for direct send
+          caption: "",
         })
       }
     } catch (error) {
       console.log("Image picker error:", error)
     }
-    setShowAttachmentOptions(false) // Close attachment options after picking
+    setShowAttachmentOptions(false)
   }
 
   const pickDocument = async () => {
@@ -1603,7 +1584,6 @@ const ChatScreen = ({ route, navigation }) => {
           uri: result.uri,
           name: result.name,
         })
-        // setShowMediaPreview(true) // Keep for documents if a preview is desired
       }
     } catch (error) {
       console.log("Document picker error:", error)
@@ -1625,7 +1605,6 @@ const ChatScreen = ({ route, navigation }) => {
           name: result.name,
           duration: "0:30",
         })
-        // setShowMediaPreview(true) // Keep for audio if a preview is desired
       }
     } catch (error) {
       console.log("Audio picker error:", error)
@@ -1633,7 +1612,6 @@ const ChatScreen = ({ route, navigation }) => {
     setShowAttachmentOptions(false)
   }
 
-  // IMPROVEMENT 1: Enhanced outside press handler
   const handleOutsidePress = () => {
     if (showAttachmentOptions) {
       setShowAttachmentOptions(false)
@@ -1691,7 +1669,6 @@ const ChatScreen = ({ route, navigation }) => {
     }, 100)
   }
 
-  // Refactored to be more generic for direct sends
   const sendMediaMessage = ({ type, uri, caption, duration, name }) => {
     const newMessage = createMessageWithAnimation({
       id: Date.now().toString(),
@@ -1735,7 +1712,6 @@ const ChatScreen = ({ route, navigation }) => {
       ]).start()
     }, 50)
 
-    // setShowMediaPreview(false) // No longer needed for images
     setMediaPreview(null)
     setPreviewCaption("")
     setReplyingTo(null)
@@ -1780,7 +1756,6 @@ const ChatScreen = ({ route, navigation }) => {
         ]}
         {...panHandlers}
       >
-        {/* IMPROVEMENT 4: WhatsApp-style selection background */}
         {isSelected && (
           <View
             style={[
@@ -1799,12 +1774,7 @@ const ChatScreen = ({ route, navigation }) => {
           />
         )}
         <View
-          style={[
-            styles.messageContainer,
-            item.isUser ? styles.userMessageContainer : styles.receivedMessageContainer,
-            // IMPROVEMENT 4: Remove the old selection styling
-            // isSelected && styles.selectedMessage, // REMOVED
-          ]}
+          style={[styles.messageContainer, item.isUser ? styles.userMessageContainer : styles.receivedMessageContainer]}
         >
           <TouchableOpacity
             activeOpacity={0.8}
@@ -1816,19 +1786,13 @@ const ChatScreen = ({ route, navigation }) => {
             {/* Enhanced Reply Preview */}
             {item.replyTo && (
               <View style={styles.replyPreview}>
-                <LinearGradient
-                  // MODIFIED: Reply preview container to be white
-                  colors={["#FFFFFF", "#F5F5F5"]}
-                  style={styles.replyGradient}
-                >
-                  {/* MODIFIED: Reply preview bar to be black */}
+                <LinearGradient colors={["#FFFFFF", "#F5F5F5"]} style={styles.replyGradient}>
                   <View style={[styles.replyPreviewBar, { backgroundColor: "#1e1e1e" }]} />
                   <View style={styles.replyPreviewContent}>
                     <Text
                       style={[
                         styles.replyPreviewName,
                         {
-                          // MODIFIED: Reply preview name text to be black
                           color: "#1e1e1e",
                         },
                       ]}
@@ -1839,7 +1803,6 @@ const ChatScreen = ({ route, navigation }) => {
                       style={[
                         styles.replyPreviewText,
                         {
-                          // MODIFIED: Reply preview text to be black
                           color: "#1e1e1e",
                         },
                       ]}
@@ -1914,7 +1877,7 @@ const ChatScreen = ({ route, navigation }) => {
                               style={[
                                 styles.waveformBar,
                                 {
-                                  height: `${Math.max(20, bar.height * 100)}%`, // Restored to direct height calculation
+                                  height: `${Math.max(20, bar.height * 100)}%`,
                                   backgroundColor: isPlayed
                                     ? item.isUser
                                       ? "#fff"
@@ -2326,15 +2289,6 @@ const ChatScreen = ({ route, navigation }) => {
               </TouchableOpacity>
               <View style={styles.imageModalActions}>
                 <TouchableOpacity onPress={toggleFavorite} style={styles.modalActionButton}></TouchableOpacity>
-                {/* REMOVED: Delete button from image modal */}
-                {/* <TouchableOpacity onPress={deleteImage} style={styles.modalActionButton}>
-                  <LinearGradient
-                    colors={["rgba(255,107,107,0.7)", "rgba(255,107,107,0.7)"]}
-                    style={styles.modalButtonGradient}
-                  >
-                    <Ionicons name="trash-outline" size={24} color="#fff" />
-                  </LinearGradient>
-                </TouchableOpacity> */}
               </View>
             </View>
 
@@ -2348,86 +2302,6 @@ const ChatScreen = ({ route, navigation }) => {
     )
   }
 
-  // REMOVED: Media Preview Modal (for images)
-  // const renderMediaPreviewModal = () => {
-  //   if (!showMediaPreview || !mediaPreview) return null
-
-  //   return (
-  //     <Modal
-  //       visible={showMediaPreview}
-  //       transparent={true}
-  //       animationType="slide"
-  //       onRequestClose={() => setShowMediaPreview(false)}
-  //     >
-  //       <View style={styles.mediaPreviewContainer}>
-  //         <LinearGradient colors={["rgba(30,30,30,0.95)", "rgba(30,30,30,0.9)"]} style={styles.mediaPreviewOverlay}>
-  //           {/* Header */}
-  //           <View style={[styles.mediaPreviewHeader, { backgroundColor: "rgba(255,255,255,0.9)" }]}>
-  //             <TouchableOpacity onPress={() => setShowMediaPreview(false)} style={styles.modalBackButton}>
-  //               <LinearGradient
-  //                 colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.1)"]}
-  //                 style={styles.modalButtonGradient}
-  //               >
-  //                 <Ionicons name="arrow-back" size={24} color="#111" />
-  //               </LinearGradient>
-  //             </TouchableOpacity>
-  //             <Text style={styles.mediaPreviewTitle}>Send {mediaPreview.type}</Text>
-  //             <View style={{ width: 44 }} />
-  //           </View>
-
-  //           {/* Media Content */}
-  //           <View style={styles.mediaPreviewContent}>
-  //             {mediaPreview.type === "image" && (
-  //               <Image source={{ uri: mediaPreview.uri }} style={styles.previewImage} resizeMode="contain" />
-  //             )}
-  //             {mediaPreview.type === "audio" && (
-  //               <View style={styles.previewAudioContainer}>
-  //                 <LinearGradient colors={["#FFD166", "#FFB74D"]} style={styles.previewAudioIcon}>
-  //                   <Ionicons name="musical-notes" size={48} color="#111" />
-  //                 </LinearGradient>
-  //                 <Text style={styles.previewAudioName}>{mediaPreview.name || "Audio File"}</Text>
-  //                 <Text style={styles.previewAudioDuration}>{mediaPreview.duration}</Text>
-  //               </View>
-  //             )}
-  //             {mediaPreview.type === "document" && (
-  //               <View style={styles.previewDocumentContainer}>
-  //                 <LinearGradient colors={["#1e1e1e", "#2a2a2a"]} style={styles.previewDocumentIcon}>
-  //                   <Ionicons name="document-text" size={48} color="#111" />
-  //                 </LinearGradient>
-  //                 <Text style={styles.previewDocumentName}>{mediaPreview.name}</Text>
-  //                 <Text style={styles.previewDocumentType}>Document</Text>
-  //               </View>
-  //             )}
-  //           </View>
-
-  //           {/* Caption Input */}
-  //           <View style={styles.captionContainer}>
-  //             <View style={[styles.captionBlur, { backgroundColor: "#111" }]}>
-  //               <TextInput
-  //                 style={styles.captionInput}
-  //                 placeholder="Add a caption..."
-  //                 placeholderTextColor="rgba(30, 30, 30, 0.5)"
-  //                 value={previewCaption}
-  //                 onChangeText={setPreviewCaption}
-  //                 multiline
-  //               />
-  //             </View>
-  //           </View>
-
-  //           {/* Send Button */}
-  //           <View style={styles.mediaPreviewFooter}>
-  //             <TouchableOpacity style={styles.mediaSendButton} onPress={sendMediaMessage}>
-  //               <LinearGradient colors={["#1e1e1e", "#2a2a2a"]} style={styles.mediaSendGradient}>
-  //                 <Ionicons name="send" size={24} color="#111" />
-  //               </LinearGradient>
-  //             </TouchableOpacity>
-  //           </View>
-  //         </LinearGradient>
-  //       </View>
-  //     </Modal>
-  //   )
-  // }
-
   // Encryption notice component
   const renderEncryptionNotice = () => {
     return (
@@ -2440,6 +2314,15 @@ const ChatScreen = ({ route, navigation }) => {
             </Text>
           </View>
         </View>
+      </View>
+    )
+  }
+
+  // NEW: Default Avatar Component
+  const renderDefaultAvatar = () => {
+    return (
+      <View style={styles.defaultAvatarContainer}>
+        <Ionicons name="person" size={24} color="#000" />
       </View>
     )
   }
@@ -2480,10 +2363,6 @@ const ChatScreen = ({ route, navigation }) => {
                         <Ionicons name="arrow-undo" size={20} color="#fff" />
                       </TouchableOpacity>
                     )}
-                    {/* Removed Favorite Button */}
-                    {/* <TouchableOpacity style={styles.headerButton} onPress={handleFavoriteMessages}>
-                      <Ionicons name="heart" size={20} color="#fff" />
-                    </TouchableOpacity> */}
                     <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMessages}>
                       <Ionicons name="trash" size={20} color="#fff" />
                     </TouchableOpacity>
@@ -2497,12 +2376,11 @@ const ChatScreen = ({ route, navigation }) => {
                       <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
                     <View style={styles.avatarContainer}>
-                      <Image
-                        source={{
-                          uri: chatItem?.image || "https://i.pravatar.cc/50",
-                        }}
-                        style={styles.headerAvatar}
-                      />
+                      {chatItem?.image ? (
+                        <Image source={{ uri: chatItem.image }} style={styles.headerAvatar} />
+                      ) : (
+                        renderDefaultAvatar()
+                      )}
                       {chatItem?.isOnline && <View style={styles.onlineIndicator} />}
                     </View>
                     <View style={styles.headerInfo}>
@@ -2557,7 +2435,6 @@ const ChatScreen = ({ route, navigation }) => {
                 styles.scrollToBottomButton,
                 {
                   transform: [{ scale: scrollButtonScale }],
-                  // Adjust bottom position based on keyboard/emoji picker
                   bottom:
                     showEmojiPicker && !isKeyboardVisible ? 350 + 20 : keyboardHeight > 0 ? keyboardHeight + 20 : 20,
                 },
@@ -2712,9 +2589,6 @@ const ChatScreen = ({ route, navigation }) => {
 
         {/* Image Modal */}
         {renderImageModal()}
-
-        {/* Media Preview Modal (removed for images, but can be re-added for documents/audio if needed) */}
-        {/* {renderMediaPreviewModal()} */}
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   )
@@ -2774,6 +2648,17 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
+    borderWidth: Platform.OS === "ios" ? 2 : 1.5,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  // NEW: Default Avatar Styles
+  defaultAvatarContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: Platform.OS === "ios" ? 2 : 1.5,
     borderColor: "rgba(255,255,255,0.3)",
   },
@@ -2867,12 +2752,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderBottomLeftRadius: Platform.OS === "ios" ? 6 : 4,
   },
-  // IMPROVEMENT 4: Remove old selection styling
-  // selectedMessage: {
-  //   backgroundColor: "#2a2a2a",
-  //   borderWidth: 2,
-  //   borderColor: "#4ECDC4",
-  // },
   messageTouchable: {
     width: "100%",
   },
@@ -3300,6 +3179,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+  },
+  emojiButton: {
+    padding: 8,
   },
   emojiText: {
     fontSize: 24,
