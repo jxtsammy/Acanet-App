@@ -1,5 +1,4 @@
 "use client"
-import { useState, useRef, useEffect } from "react"
 import {
   View,
   Text,
@@ -21,12 +20,16 @@ import {
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
+  Linking, // Add this import
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import Ionicons from "react-native-vector-icons/Ionicons"
 import * as ImagePicker from "expo-image-picker"
 import * as DocumentPicker from "expo-document-picker"
 import { Audio } from "expo-av"
+import { useEffect } from "react"
+import { useRef } from "react"
+import { useState } from "react"
 
 const { width, height } = Dimensions.get("window")
 const SWIPE_THRESHOLD = -80
@@ -732,8 +735,8 @@ const CATEGORY_ICONS = {
 
 const ChatScreen = ({ route, navigation }) => {
   const { chatItem } = route.params || {
-    firstName: "Alex",
-    lastName: "Morgan",
+    firstName: "Open",
+    lastName: "Chat",
     image: null, // Changed to null to show default avatar
     isOnline: true,
   }
@@ -934,7 +937,7 @@ const ChatScreen = ({ route, navigation }) => {
         audioUri: "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
       },
       {
-        id: "5",
+        id: "4",
         time: "11:31 PM",
         isUser: false,
         isRead: false,
@@ -1028,12 +1031,28 @@ const ChatScreen = ({ route, navigation }) => {
   // ENHANCED Setup audio configuration for iOS and Android
   const setupAudio = async () => {
     try {
+      // Request microphone permissions
       const { status } = await Audio.requestPermissionsAsync()
+
       if (status !== "granted") {
         Alert.alert(
-          "Permission Required",
-          "Microphone access is required for voice recording. Please enable it in your device settings.",
-          [{ text: "OK" }],
+          "Microphone Permission Required",
+          Platform.OS === "ios"
+            ? "To send voice messages, please allow microphone access in Settings > Privacy & Security > Microphone > [App Name]"
+            : "To send voice messages, please allow microphone access in your device settings.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: () => {
+                if (Platform.OS === "ios") {
+                  Linking.openURL("app-settings:")
+                } else {
+                  Linking.openSettings()
+                }
+              },
+            },
+          ],
         )
         return false
       }
@@ -1051,7 +1070,11 @@ const ChatScreen = ({ route, navigation }) => {
       return true
     } catch (error) {
       console.log("Audio setup error:", error)
-      Alert.alert("Audio Setup Error", "Failed to initialize audio recording. Please try again.")
+      Alert.alert(
+        "Audio Setup Error",
+        "Failed to initialize audio recording. Please check your device's microphone permissions and try again.",
+        [{ text: "OK" }],
+      )
       return false
     }
   }
@@ -1392,8 +1415,22 @@ const ChatScreen = ({ route, navigation }) => {
       console.error("Failed to start recording", err)
       Alert.alert(
         "Recording Failed",
-        `Unable to start voice recording. ${Platform.OS === "ios" ? "Please check microphone permissions in Settings." : "Please check microphone permissions."}`,
-        [{ text: "OK" }],
+        Platform.OS === "ios"
+          ? "Unable to start voice recording. Please check microphone permissions in Settings > Privacy & Security > Microphone > [App Name]"
+          : "Unable to start voice recording. Please check microphone permissions in your device settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: () => {
+              if (Platform.OS === "ios") {
+                Linking.openURL("app-settings:")
+              } else {
+                Linking.openSettings()
+              }
+            },
+          },
+        ],
       )
     }
   }
