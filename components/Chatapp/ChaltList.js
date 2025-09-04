@@ -610,8 +610,10 @@ const ChatListScreen = ({ navigation }) => {
               ]}
             >
               <Text style={styles.headerTitle}>{activeFilter === "Archived" ? "Archived Chats" : "Chats"}</Text>
-              <TouchableOpacity style={styles.profileButton}>
-                <Image source={{ uri: "https://i.pravatar.cc/40?img=1" }} style={styles.profileImage} />
+              <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate("Home", { screen: "Settings" })}>
+                <View style={styles.profileImage}>
+                  <Icon name="person" size={24} color="#000" />
+                </View>
               </TouchableOpacity>
             </Animated.View>
 
@@ -680,65 +682,64 @@ const ChatListScreen = ({ navigation }) => {
 
             {/* Content Container */}
             <View style={styles.contentContainer}>
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <Icon name="search" size={20} color="#fff" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search chats..."
-                  placeholderTextColor="#fff"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery("")}>
-                    <Icon name="close" size={20} color="#9E9E9E" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Filter Tabs */}
-              <View style={styles.filterContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterContent}
-                >
-                  {["All", "Unread", "Read", "Favorites", "Archived"].map((filter) => (
-                    <TouchableOpacity
-                      key={filter}
-                      style={[styles.filterTab, activeFilter === filter && styles.activeFilterTab]}
-                      onPress={() => setActiveFilter(filter)}
-                    >
-                      <Text style={[styles.filterText, activeFilter === filter && styles.activeFilterText]}>
-                        {filter}
-                      </Text>
-                      {filter === "Archived" && (
-                        <Icon
-                          name="archive"
-                          size={16}
-                          color={activeFilter === filter ? "#1a1a1a" : "rgba(255, 255, 255, 0.7)"}
-                          style={styles.filterIcon}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
               {/* Chat List */}
               <View style={styles.chatListContainer}>
-                <Text style={styles.sectionTitle}>
-                  {activeFilter === "Archived" ? "Archived Chats" : "Recent Chats"}
-                </Text>
-
                 <ScrollView
                   style={styles.chatList}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.chatListContent}
                 >
-                  {filteredChats.map(renderChatItem)}
+                  {/* Section Title */}
+                  <Text style={styles.sectionTitle}>
+                    {activeFilter === "Archived" ? "Archived Chats" : "Recent Chats"}
+                  </Text>
 
+                  {/* Search Bar */}
+                  <View style={styles.searchContainer}>
+                    <Icon name="search" size={20} color="#fff" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search chats..."
+                      placeholderTextColor="#fff"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                    {searchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setSearchQuery("")}>
+                        <Icon name="close" size={20} color="#9E9E9E" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Filter Tabs */}
+                  <View style={styles.filterContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.filterContent}
+                    >
+                      {["All", "Unread", "Read", "Favorites", "Archived"].map((filter) => (
+                        <TouchableOpacity
+                          key={filter}
+                          style={[styles.filterTab, activeFilter === filter && styles.activeFilterTab]}
+                          onPress={() => setActiveFilter(filter)}
+                        >
+                          <Text style={[styles.filterText, activeFilter === filter && styles.activeFilterText]}>
+                            {filter}
+                          </Text>
+                          {filter === "Archived" && (
+                            <Icon
+                              name="archive"
+                              size={16}
+                              color={activeFilter === filter ? "#1a1a1a" : "rgba(255, 255, 255, 0.7)"}
+                              style={styles.filterIcon}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                  {filteredChats.map(renderChatItem)}
                   {filteredChats.length === 0 && (
                     <View style={styles.emptyState}>
                       <Icon
@@ -754,8 +755,8 @@ const ChatListScreen = ({ navigation }) => {
                         {activeFilter === "Archived"
                           ? "Archived chats will appear here"
                           : activeFilter !== "All"
-                            ? `No ${activeFilter.toLowerCase()} chats`
-                            : "Try adjusting your search"}
+                          ? `No ${activeFilter.toLowerCase()} chats`
+                          : "Try adjusting your search"}
                       </Text>
                     </View>
                   )}
@@ -830,8 +831,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "white",
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
   },
   selectionLeft: {
     flexDirection: "row",
@@ -853,7 +855,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginTop: Platform.OS === "ios" ? 120 : StatusBar.currentHeight + 40,
+    marginTop: Platform.OS === "ios" ? 100 : StatusBar.currentHeight + 40,
   },
   searchContainer: {
     flexDirection: "row",
@@ -909,7 +911,7 @@ const styles = StyleSheet.create({
   },
   chatListContainer: {
     flex: 1,
-    paddingTop: 16,
+    // paddingTop: 16,  <--- Removed this as we're moving items into the ScrollView
   },
   sectionTitle: {
     fontSize: 20,
@@ -917,6 +919,7 @@ const styles = StyleSheet.create({
     color: "white",
     paddingHorizontal: 20,
     marginBottom: 16,
+    paddingTop: 16, // Add padding here since it's now in the ScrollView
   },
   chatList: {
     flex: 1,

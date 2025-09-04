@@ -20,6 +20,8 @@ import { BlurView } from "expo-blur"
 import * as ImagePicker from "expo-image-picker"
 import { ArrowLeft, CheckCircle, Paperclip, Send, ShieldCheck } from "lucide-react-native"
 import { generateAcademicResponse, generateAIResponseFromImage, getImageInfo } from "./services/geminiAPI"
+import { FIRESTORE_DB, FIREBASE_AUTH, FIREBASE_APP } from '../../firebaseConfig'
+import { collection, addDoc, query, onSnapshot, orderBy } from "firebase/firestore"
 
 // Typing Indicator Component
 const TypingIndicator = () => {
@@ -53,7 +55,7 @@ const TypingIndicator = () => {
 
   return (
     <View style={[styles.messageContainer, styles.receivedMessageContainer, { marginBottom: 15 }]}>
-      <Image source={require("../../assets/abg.jpg")} style={styles.profilePicture} />
+      <Image source={require("../../assets/b68d4348592732c5abcd0c9825fa9302.jpg")} style={styles.profilePicture} />
       <View style={[styles.messageBubble, styles.receivedMessage, styles.typingBubble]}>
         <Animated.Text style={[styles.typingDot, { opacity: dot1 }]}>•</Animated.Text>
         <Animated.Text style={[styles.typingDot, { opacity: dot2 }]}>•</Animated.Text>
@@ -71,16 +73,31 @@ const ChatScreen = ({ navigation }) => {
   const [isOnline, setIsOnline] = useState(true)
   const [showPredefinedMessages, setShowPredefinedMessages] = useState(true)
   const [isAIThinking, setIsAIThinking] = useState(false)
-  const [selectedImage, setSelectedImage] = useState(null) // Store selected image temporarily
+  const [selectedImage, setSelectedImage] = useState(null)
 
-  // Predefined messages for the tabs
   const predefinedMessages = [
-    "What is the capital of France?",
-    "Explain quantum physics simply.",
-    "Summarize the last lecture.",
-    "Help me with my essay outline.",
-    "What are the best study techniques?",
-  ]
+    "Explain photosynthesis in simple terms.",
+    "What is the Pythagorean theorem?",
+    "Summarize the plot of 'Romeo and Juliet'.",
+    "How does a computer work?",
+  ];
+
+  // Fetch conversations from Firestore on component mount
+  useEffect(() => {
+    const q = query(
+      collection(FIRESTORE_DB, "chats"),
+      orderBy("time", "asc")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedMessages = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMessages(fetchedMessages);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const requestPermissions = async () => {
     if (Platform.OS !== "web") {
@@ -151,7 +168,6 @@ const ChatScreen = ({ navigation }) => {
 
   const handleImageSelection = async (imageUri) => {
     try {
-      // Get image info to validate
       const imageInfo = await getImageInfo(imageUri)
 
       if (!imageInfo || !imageInfo.exists) {
@@ -160,11 +176,10 @@ const ChatScreen = ({ navigation }) => {
       }
 
       if (!imageInfo.isValidImage) {
-        Alert.alert("Invalid Image", "Please select a valid image file (JPG, PNG, GIF, WebP, BMP, TIFF, HEIC, HEIF).")
+        Alert.alert("Invalid Image", "Please select a valid image file.")
         return
       }
 
-      // Store the selected image temporarily (don't send yet)
       setSelectedImage({
         uri: imageUri,
         info: imageInfo,
@@ -201,114 +216,105 @@ const ChatScreen = ({ navigation }) => {
     setIsSelectionMode(false)
   }
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const hasText = inputText.trim()
     const hasImage = selectedImage
 
     if (!hasText && !hasImage) {
-      return // Nothing to send
+      return
     }
 
-    // Create message object
     const newMessage = {
-      id: Date.now().toString(),
       text: inputText,
       image: selectedImage?.uri || null,
       imageInfo: selectedImage?.info || null,
       isSent: true,
-      time: new Date().toLocaleTimeString(),
+      time: new Date().toISOString(),
+      userId: FIREBASE_AUTH.currentUser?.uid,
     }
 
-    // Store the data before clearing
-    const userMessage = inputText
-    const imageUri = selectedImage?.uri || null
+    try {
+      await addDoc(collection(FIRESTORE_DB, "chats"), newMessage)
 
-    // Add message to chat
-    setMessages((prevMessages) => [...prevMessages, newMessage])
+      setInputText("")
+      setSelectedImage(null)
+      setShowPredefinedMessages(false)
 
-    // Clear inputs
-    setInputText("")
-    setSelectedImage(null)
-    setShowPredefinedMessages(false)
-
-    // Generate AI response
-    handleBotResponse(userMessage, imageUri)
+      handleBotResponse(inputText, selectedImage?.uri)
+    } catch (error) {
+      console.error("Error saving message:", error)
+      Alert.alert("Error", "Failed to send message. Please try again.")
+    }
   }
 
   const handleBotResponse = async (userMessage = "", imageUri = null) => {
     try {
       setIsAIThinking(true)
 
-      // Add typing indicator
       setMessages((prevMessages) => [...prevMessages, { id: "typing", type: "typing" }])
 
       let aiResponse = ""
 
       if (imageUri && userMessage) {
-        // Handle image with text
         aiResponse = await generateAIResponseFromImage(imageUri, userMessage)
       } else if (imageUri) {
-        // Handle image only
         aiResponse = await generateAIResponseFromImage(
           imageUri,
           "What do you see in this image? Please provide a detailed analysis.",
         )
       } else if (userMessage) {
-        // Handle text only
         aiResponse = await generateAcademicResponse(userMessage)
       } else {
-        // Fallback
-        aiResponse = "Hello! I'm your Academic Assistant powered by AI. How can I help you with your studies today?"
+        aiResponse = "Hello! I'm your Academic Assistant. How can I help?"
       }
 
-      // Remove typing indicator and add AI response
-      setMessages((prevMessages) => {
-        const updatedMessages = prevMessages.filter((msg) => msg.id !== "typing")
-        const botMessage = {
-          id: Date.now().toString(),
-          text: aiResponse,
-          isSent: false,
-          time: new Date().toLocaleTimeString(),
-        }
-        return [...updatedMessages, botMessage]
-      })
+      const botMessage = {
+        text: aiResponse,
+        isSent: false,
+        time: new Date().toISOString(),
+        userId: "bot",
+      }
 
+      await addDoc(collection(FIRESTORE_DB, "chats"), botMessage)
+
+      setMessages((prevMessages) => prevMessages.filter((msg) => msg.id !== "typing"))
       setShowPredefinedMessages(true)
     } catch (error) {
       console.error("Error getting AI response:", error)
 
-      // Remove typing indicator and show error message
       setMessages((prevMessages) => {
         const updatedMessages = prevMessages.filter((msg) => msg.id !== "typing")
         const errorMessage = {
-          id: Date.now().toString(),
           text: "I apologize, but I'm having trouble processing your request right now. Please try again.",
           isSent: false,
-          time: new Date().toLocaleTimeString(),
+          time: new Date().toISOString(),
         }
         return [...updatedMessages, errorMessage]
       })
-
       setShowPredefinedMessages(true)
     } finally {
       setIsAIThinking(false)
     }
   }
 
-  const handlePredefinedMessage = (message) => {
+  const handlePredefinedMessage = async (message) => {
     setInputText(message)
     setShowPredefinedMessages(false)
 
-    // Automatically send the predefined message
     const newMessage = {
-      id: Date.now().toString(),
       text: message,
       isSent: true,
-      time: new Date().toLocaleTimeString(),
+      time: new Date().toISOString(),
+      userId: FIREBASE_AUTH.currentUser?.uid,
     }
 
-    setMessages((prevMessages) => [...prevMessages, newMessage])
-    handleBotResponse(message)
+    try {
+      await addDoc(collection(FIRESTORE_DB, "chats"), newMessage)
+      handleBotResponse(message)
+    } catch (error) {
+      console.error("Error saving predefined message:", error)
+      Alert.alert("Error", "Failed to send message. Please try again.")
+    }
   }
 
   const renderMessage = ({ item }) => {
@@ -356,7 +362,7 @@ const ChatScreen = ({ navigation }) => {
             </View>
           )}
           {item.text ? <Text style={styles.messageText}>{item.text}</Text> : null}
-          <Text style={styles.messageTime}>{item.time}</Text>
+          <Text style={styles.messageTime}>{new Date(item.time).toLocaleTimeString()}</Text>
         </View>
       </TouchableOpacity>
     )
@@ -447,7 +453,6 @@ const ChatScreen = ({ navigation }) => {
                 </ScrollView>
               )}
 
-              {/* Show selected image preview */}
               {selectedImage && (
                 <View style={styles.imagePreviewContainer}>
                   <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} />
