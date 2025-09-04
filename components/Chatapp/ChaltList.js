@@ -36,12 +36,12 @@ const ChatListScreen = ({ navigation }) => {
   const [chats, setChats] = useState([
     {
       id: "1",
-      firstName: "Alex",
-      lastName: "Linderson",
+      firstName: "Leonard",
+      lastName: "Miebo",
       message: "How are you today?",
       time: "2 min ago",
       unread: 3,
-      image: "https://i.pravatar.cc/50?img=6",
+      image: null, // Changed to null to show default avatar
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -60,7 +60,7 @@ const ChatListScreen = ({ navigation }) => {
       message: "Don't miss the meeting.",
       time: "5 min ago",
       unread: 0,
-      image: "https://i.pravatar.cc/50?img=7",
+      image: null,
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -74,12 +74,12 @@ const ChatListScreen = ({ navigation }) => {
     },
     {
       id: "3",
-      firstName: "John",
-      lastName: "Abraham",
+      firstName: "Nasser",
+      lastName: "Jagawada",
       message: "Can you join the meeting?",
       time: "10 min ago",
       unread: 1,
-      image: "https://i.pravatar.cc/50?img=8",
+      image: null, // Changed to null to show default avatar
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -98,7 +98,7 @@ const ChatListScreen = ({ navigation }) => {
       message: "How are you today?",
       time: "20 min ago",
       unread: 0,
-      image: "https://i.pravatar.cc/50?img=9",
+      image: null,
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -112,12 +112,12 @@ const ChatListScreen = ({ navigation }) => {
     },
     {
       id: "5",
-      firstName: "John",
-      lastName: "Borino",
+      firstName: "Bernard",
+      lastName: "Adjei",
       message: "Have a good day 🌸",
       time: "30 min ago",
       unread: 0,
-      image: "https://i.pravatar.cc/50?img=10",
+      image: null, // Changed to null to show default avatar
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -136,7 +136,7 @@ const ChatListScreen = ({ navigation }) => {
       message: "Let me know when you're free!",
       time: "1 hr ago",
       unread: 0,
-      image: "https://i.pravatar.cc/50?img=11",
+      image: null,
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -151,12 +151,12 @@ const ChatListScreen = ({ navigation }) => {
     // Additional chat items
     {
       id: "7",
-      firstName: "Emma",
-      lastName: "Watson",
+      firstName: "Emmanuel",
+      lastName: "Offei",
       message: "Thanks for the help yesterday!",
       time: "2 hrs ago",
       unread: 2,
-      image: "https://i.pravatar.cc/50?img=12",
+      image: null, // Changed to null to show default avatar
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -170,50 +170,12 @@ const ChatListScreen = ({ navigation }) => {
     },
     {
       id: "8",
-      firstName: "Michael",
-      lastName: "Johnson",
-      message: "See you at the conference tomorrow",
-      time: "3 hrs ago",
-      unread: 0,
-      image: "https://i.pravatar.cc/50?img=13",
-      isSelected: false,
-      isMuted: true,
-      isPinned: false,
-      isOnline: true,
-      isSent: true,
-      isTyping: false,
-      isFavorite: false,
-      isArchived: false,
-      lastMessageTime: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-      messageType: "text",
-    },
-    {
-      id: "9",
-      firstName: "Sarah",
-      lastName: "Connor",
-      message: "The project deadline is next week",
-      time: "4 hrs ago",
-      unread: 1,
-      image: "https://i.pravatar.cc/50?img=14",
-      isSelected: false,
-      isMuted: false,
-      isPinned: false,
-      isOnline: false,
-      isSent: false,
-      isTyping: false,
-      isFavorite: false,
-      isArchived: false,
-      lastMessageTime: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-      messageType: "text",
-    },
-    {
-      id: "10",
-      firstName: "David",
-      lastName: "Miller",
+      firstName: "Roger",
+      lastName: "Adu",
       message: "Great job on the presentation!",
       time: "5 hrs ago",
       unread: 0,
-      image: "https://i.pravatar.cc/50?img=15",
+      image: null,
       isSelected: false,
       isMuted: false,
       isPinned: true,
@@ -226,13 +188,13 @@ const ChatListScreen = ({ navigation }) => {
       messageType: "text",
     },
     {
-      id: "11",
+      id: "9",
       firstName: "Lisa",
       lastName: "Anderson",
       message: "Can we reschedule our meeting?",
       time: "6 hrs ago",
       unread: 0,
-      image: "https://i.pravatar.cc/50?img=16",
+      image: null, // Changed to null to show default avatar
       isSelected: false,
       isMuted: false,
       isPinned: false,
@@ -242,6 +204,25 @@ const ChatListScreen = ({ navigation }) => {
       isFavorite: false,
       isArchived: false,
       lastMessageTime: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
+      messageType: "text",
+    },
+    {
+      id: "10",
+      firstName: "Robert",
+      lastName: "Brown",
+      message: "Happy birthday! 🎉",
+      time: "1 day ago",
+      unread: 0,
+      image: null,
+      isSelected: false,
+      isMuted: false,
+      isPinned: false,
+      isOnline: true,
+      isSent: false,
+      isTyping: false,
+      isFavorite: false,
+      isArchived: false,
+      lastMessageTime: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
       messageType: "text",
     },
   ])
@@ -528,7 +509,7 @@ const ChatListScreen = ({ navigation }) => {
     return allArchived ? "unarchive" : "archive"
   }
 
-  // Render chat item
+  // Render chat item with default avatar support
   const renderChatItem = (item) => (
     <TouchableOpacity
       key={item.id}
@@ -543,7 +524,13 @@ const ChatListScreen = ({ navigation }) => {
       activeOpacity={0.7}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.image }} style={styles.avatar} />
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.defaultAvatar]}>
+            <Icon name="person" size={32} color="#000" />
+          </View>
+        )}
         {item.isOnline && <View style={styles.onlineIndicator} />}
         {item.isSelected && (
           <View style={styles.selectionIndicator}>
@@ -623,6 +610,11 @@ const ChatListScreen = ({ navigation }) => {
               ]}
             >
               <Text style={styles.headerTitle}>{activeFilter === "Archived" ? "Archived Chats" : "Chats"}</Text>
+              <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate("Home", { screen: "Settings" })}>
+                <View style={styles.profileImage}>
+                  <Icon name="person" size={24} color="#000" />
+                </View>
+              </TouchableOpacity>
             </Animated.View>
 
             {/* Selection Header */}
@@ -690,65 +682,64 @@ const ChatListScreen = ({ navigation }) => {
 
             {/* Content Container */}
             <View style={styles.contentContainer}>
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <Icon name="search" size={20} color="#fff" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search chats..."
-                  placeholderTextColor="#fff"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery("")}>
-                    <Icon name="close" size={20} color="#9E9E9E" />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Filter Tabs */}
-              <View style={styles.filterContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterContent}
-                >
-                  {["All", "Unread", "Read", "Favorites", "Archived"].map((filter) => (
-                    <TouchableOpacity
-                      key={filter}
-                      style={[styles.filterTab, activeFilter === filter && styles.activeFilterTab]}
-                      onPress={() => setActiveFilter(filter)}
-                    >
-                      <Text style={[styles.filterText, activeFilter === filter && styles.activeFilterText]}>
-                        {filter}
-                      </Text>
-                      {filter === "Archived" && (
-                        <Icon
-                          name="archive"
-                          size={16}
-                          color={activeFilter === filter ? "#1a1a1a" : "rgba(255, 255, 255, 0.7)"}
-                          style={styles.filterIcon}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
               {/* Chat List */}
               <View style={styles.chatListContainer}>
-                <Text style={styles.sectionTitle}>
-                  {activeFilter === "Archived" ? "Archived Chats" : "Recent Chats"}
-                </Text>
-
                 <ScrollView
                   style={styles.chatList}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.chatListContent}
                 >
-                  {filteredChats.map(renderChatItem)}
+                  {/* Section Title */}
+                  <Text style={styles.sectionTitle}>
+                    {activeFilter === "Archived" ? "Archived Chats" : "Recent Chats"}
+                  </Text>
 
+                  {/* Search Bar */}
+                  <View style={styles.searchContainer}>
+                    <Icon name="search" size={20} color="#fff" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search chats..."
+                      placeholderTextColor="#fff"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                    {searchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setSearchQuery("")}>
+                        <Icon name="close" size={20} color="#9E9E9E" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Filter Tabs */}
+                  <View style={styles.filterContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.filterContent}
+                    >
+                      {["All", "Unread", "Read", "Favorites", "Archived"].map((filter) => (
+                        <TouchableOpacity
+                          key={filter}
+                          style={[styles.filterTab, activeFilter === filter && styles.activeFilterTab]}
+                          onPress={() => setActiveFilter(filter)}
+                        >
+                          <Text style={[styles.filterText, activeFilter === filter && styles.activeFilterText]}>
+                            {filter}
+                          </Text>
+                          {filter === "Archived" && (
+                            <Icon
+                              name="archive"
+                              size={16}
+                              color={activeFilter === filter ? "#1a1a1a" : "rgba(255, 255, 255, 0.7)"}
+                              style={styles.filterIcon}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                  {filteredChats.map(renderChatItem)}
                   {filteredChats.length === 0 && (
                     <View style={styles.emptyState}>
                       <Icon
@@ -764,8 +755,8 @@ const ChatListScreen = ({ navigation }) => {
                         {activeFilter === "Archived"
                           ? "Archived chats will appear here"
                           : activeFilter !== "All"
-                            ? `No ${activeFilter.toLowerCase()} chats`
-                            : "Try adjusting your search"}
+                          ? `No ${activeFilter.toLowerCase()} chats`
+                          : "Try adjusting your search"}
                       </Text>
                     </View>
                   )}
@@ -807,7 +798,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     position: "absolute",
-    top: Platform.OS === "ios" ? 30 : StatusBar.currentHeight + 10,
+    top: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 10,
     left: 0,
     right: 0,
     zIndex: 1,
@@ -819,11 +810,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     position: "absolute",
-    top: Platform.OS === "ios" ? 20 : StatusBar.currentHeight + 10,
+    top: Platform.OS === "ios" ? 44 : StatusBar.currentHeight + 10,
     left: 0,
     right: 0,
     zIndex: 2,
-    marginBottom: 30
   },
   headerTitle: {
     fontSize: 28,
@@ -841,8 +831,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "white",
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
   },
   selectionLeft: {
     flexDirection: "row",
@@ -864,7 +855,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginTop: Platform.OS === "ios" ? 80 : StatusBar.currentHeight + 40,
+    marginTop: Platform.OS === "ios" ? 100 : StatusBar.currentHeight + 40,
   },
   searchContainer: {
     flexDirection: "row",
@@ -920,7 +911,7 @@ const styles = StyleSheet.create({
   },
   chatListContainer: {
     flex: 1,
-    paddingTop: 16,
+    // paddingTop: 16,  <--- Removed this as we're moving items into the ScrollView
   },
   sectionTitle: {
     fontSize: 20,
@@ -928,6 +919,7 @@ const styles = StyleSheet.create({
     color: "white",
     paddingHorizontal: 20,
     marginBottom: 16,
+    paddingTop: 16, // Add padding here since it's now in the ScrollView
   },
   chatList: {
     flex: 1,
@@ -963,6 +955,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
+  },
+  defaultAvatar: {
+    backgroundColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
   },
   onlineIndicator: {
     position: "absolute",

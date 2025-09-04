@@ -27,6 +27,8 @@ import PasswordSettings from './components/Settings/PasswordSettings'
 import Notifications from './components/MyNetwork/Notifications'
 import VideoCall from './components/Chatapp/VideoCall'
 import VoiceCall from './components/Chatapp/VoiceCall'
+import ForgotPassword from './components/SignInOptions/ForgotPassword'
+import ResetSuccess from './components/SignInOptions/ResetSuccess'
 
 const Stack = createStackNavigator();
 
@@ -166,6 +168,16 @@ const App = () => {
         <Stack.Screen
           name="VoiceCall"
           component={VoiceCall}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPassword}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ResetSuccess"
+          component={ResetSuccess}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
